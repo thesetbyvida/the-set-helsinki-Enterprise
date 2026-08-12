@@ -1,3 +1,4 @@
+export type Language = "en" | "fi" | "es";
 export type AppRole = "super_admin" | "admin" | "manager" | "employee";
 
 export interface Profile {
@@ -6,10 +7,8 @@ export interface Profile {
   full_name: string | null;
   role: AppRole;
   is_active: boolean;
-  created_at?: string;
+  created_at: string;
 }
-
-export type Language = "es" | "en" | "fi";
 
 export interface Restaurant {
   id: string;
@@ -19,14 +18,16 @@ export interface Restaurant {
   email: string | null;
   color: string | null;
   logo_url: string | null;
-  opening_hours: Record<string, string> | null;
+  opening_hours: Record<string, string>;
   active: boolean;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-
-export type ContractType = "112.5h" | "0h" | "monthly";
+export interface UserRestaurant {
+  user_id: string;
+  restaurant_id: string;
+}
 
 export interface Employee {
   id: string;
@@ -37,14 +38,14 @@ export interface Employee {
   address: string | null;
   birth_date: string | null;
   job_title: string | null;
-  contract_type: ContractType;
+  contract_type: "112.5h" | "0h" | "monthly";
   contract_hours: number;
   hourly_rate: number;
   monthly_salary: number;
   bank_hours: number;
   active: boolean;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface EmployeeRestaurant {
@@ -53,23 +54,18 @@ export interface EmployeeRestaurant {
   display_order: number;
 }
 
-export interface UserRestaurant {
-  user_id: string;
-  restaurant_id: string;
-}
-
 export interface RotaPeriod {
   id: string;
   restaurant_id: string;
   start_date: string;
   end_date: string;
   created_by: string | null;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RotaShift {
-  id?: string;
+  id: string;
   period_id: string;
   restaurant_id: string;
   employee_id: string;
@@ -78,4 +74,6 @@ export interface RotaShift {
   end_time: string | null;
   code: string;
   note: string;
+  created_at: string;
+  updated_at: string;
 }
