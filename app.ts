@@ -57,3 +57,25 @@ export interface UserRestaurant {
   user_id: string;
   restaurant_id: string;
 }
+
+export interface RotaPeriod {
+  id: string;
+  restaurant_id: string;
+  start_date: string;
+  end_date: string;
+  created_by: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RotaShift {
+  id?: string;
+  period_id: string;
+  restaurant_id: string;
+  employee_id: string;
+  shift_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  code: string;
+  note: string;
+}

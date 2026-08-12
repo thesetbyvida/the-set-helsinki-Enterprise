@@ -1,93 +1,70 @@
-# The Set Helsinki Enterprise 2.0 — Phase 4 Users & Permissions
+# The Set Helsinki Enterprise 2.0 — Phase 5: 3-week Rota
 
-Entrega acumulativa: incluye Fases 1, 2, 3 y 4.
+Entrega acumulativa: incluye Fases 1, 2, 3, 4 y 5.
 
-## Incluye
+## Fase 5 — Rota de 3 semanas
 
-### Fase 1
-- Autenticación, recuperación de contraseña, roles, idiomas y navegación.
+- Rota real de **21 días**, siempre empezando en lunes.
+- Selector de restaurante y selector de fecha de inicio.
+- Botones para periodo anterior/siguiente de 3 semanas.
+- Empleados activos filtrados por restaurante y respetando `display_order`.
+- Edición por día: **Alku / Start**, **Loppu / End**, **Koodi / Code** y **Huomio / Note**.
+- Turnos que cruzan medianoche se calculan correctamente (por ejemplo 22:00–03:30 = 5.5 h).
+- Códigos iniciales: `S`, `VL`, `VV`, `V`, `VP`.
+  - `S` y `VL` = 7.5 h.
+  - `VV`, `V` y `VP` = 0 h en horas trabajadas.
+- Total semanal por empleado.
+- Cambios marcados visualmente y guardado masivo.
+- Employee = lectura; Manager/Admin/Super Admin = edición, según RLS.
 
-### Fase 2
-- Restaurantes completos y asignación de acceso por usuario.
+## Mejora de usabilidad solicitada
 
-### Fase 3
-- Empleados completos, contratos, banco de horas y restaurantes por empleado.
+- **La fila de fechas queda fija** mientras bajas por la lista de empleados.
+- **El nombre del empleado queda fijo** mientras haces scroll horizontal.
+- El nombre del día aparece junto a la fecha.
+- En impresión se muestran las **horas reales de entrada y salida**, por ejemplo `16:00–23:30`, no solamente `7.5`.
+- Código y nota también aparecen en impresión.
+- Cada semana se imprime en su propia página **A4 horizontal**.
 
-### Fase 4 — Usuarios y permisos
-- Página **Users / Usuarios / Käyttäjät** real (ya no es placeholder).
-- Lista de perfiles de Supabase.
-- Crear usuarios desde la app.
-- Roles: `employee`, `manager`, `admin`, `super_admin`.
-- Activar/desactivar usuarios.
-- Asignar uno o varios restaurantes a cada usuario.
-- Cambiar contraseña desde la app.
-- Protección para que un Admin normal no cree/modifique un `super_admin`.
-- El usuario actual no puede desactivarse ni cambiarse su propio rol desde la pantalla Users.
-- RLS reforzado para `profiles` y `user_restaurants`.
-- Edge Function segura `admin-users` usando `SUPABASE_SERVICE_ROLE_KEY` solamente en el servidor.
+## Base de datos
 
-## Estructura corregida
-
-Esta entrega normaliza el proyecto Vite/React bajo `src/`, por ejemplo:
-
-```text
-src/
-  App.tsx
-  main.tsx
-  components/
-  context/
-  lib/
-  pages/
-  styles/
-  types/
-supabase/
-  migrations/
-  functions/admin-users/
-```
-
-## Supabase — migración
-
-Si ya tienes las Fases 1–3 instaladas, ejecuta solamente:
+Si ya tienes Fases 1–4 instaladas, ejecuta solamente:
 
 ```text
-supabase/migrations/004_users_permissions.sql
+supabase/migrations/005_rota.sql
 ```
 
-Si instalas desde cero, ejecuta en orden:
+Si instalas desde cero:
 
 ```text
 001_foundation.sql
 002_restaurants.sql
 003_employees.sql
 004_users_permissions.sql
+005_rota.sql
 ```
 
-## Edge Function admin-users
+La migración crea:
 
-Con Supabase CLI, desde la raíz del proyecto:
+- `rota_periods`
+- `rota_shifts`
+- RLS para lectura por restaurante.
+- Escritura de Rota para `manager`, `admin` y `super_admin`.
+
+## Despliegue
 
 ```bash
-supabase functions deploy admin-users
+npm install
+npm run build
 ```
 
-Supabase proporciona a la Edge Function las variables `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`. No pongas la Service Role Key en Vercel ni en el frontend.
-
-La app invoca esta función para:
-
-- crear usuarios en `auth.users`;
-- crear su fila en `public.profiles`;
-- guardar sus restaurantes en `public.user_restaurants`;
-- cambiar contraseñas de forma administrativa.
-
-## Vercel
+En Vercel:
 
 - Framework: Vite
 - Build Command: `npm run build`
 - Output Directory: `dist`
 - Root Directory: `./`
 
-Mantén las mismas variables públicas de Supabase que ya usabas en la Fase 3.
+## Siguiente fase
 
-## Próxima entrega
-
-Fase 5: Rota de 3 semanas.
+**Phase 6:** motor de cálculo TES / HourCalc para evening, night, Sunday, holiday y aatto-lisä, preparando Payroll.
