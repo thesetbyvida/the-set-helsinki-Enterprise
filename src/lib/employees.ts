@@ -122,3 +122,22 @@ export async function saveEmployeeRestaurants(employeeId: string, restaurantIds:
   );
   if (error) throw error;
 }
+
+export async function saveRestaurantEmployeeOrder(restaurantId: string, employeeIds: string[]) {
+  if (!supabase) throw new Error("Supabase is not configured");
+
+  // Keep the same order for this restaurant across all three rota weeks.
+  // Updates are intentionally scoped by both restaurant_id and employee_id.
+  const results = await Promise.all(
+    employeeIds.map((employeeId, index) =>
+      supabase
+        .from("employee_restaurants")
+        .update({ display_order: index + 1 })
+        .eq("restaurant_id", restaurantId)
+        .eq("employee_id", employeeId)
+    )
+  );
+
+  const failed = results.find((result) => result.error);
+  if (failed?.error) throw failed.error;
+}

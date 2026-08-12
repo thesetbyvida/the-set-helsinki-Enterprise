@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { listRestaurants } from "../lib/restaurants";
-import { listEmployeeRestaurants, listEmployees } from "../lib/employees";
+import { listEmployeeRestaurants, listEmployees, saveRestaurantEmployeeOrder } from "../lib/employees";
 import { formatError } from "../lib/errors";
 import {
   addDays,
@@ -33,6 +33,7 @@ function hoursLabel(value: number) {
 export function RotaPage() {
   const { profile, language, t } = useApp();
   const canEdit = Boolean(profile && ["super_admin", "admin", "manager"].includes(profile.role));
+  const canReorder = Boolean(profile && ["super_admin", "admin"].includes(profile.role));
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeRestaurants, setEmployeeRestaurants] = useState<EmployeeRestaurant[]>([]);
@@ -45,6 +46,8 @@ export function RotaPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [ordering, setOrdering] = useState(false);
+  const [draggedEmployeeId, setDraggedEmployeeId] = useState<string | null>(null);
 
   const locale = language === "fi" ? "fi-FI" : language === "en" ? "en-GB" : "es-ES";
 
@@ -158,6 +161,57 @@ export function RotaPage() {
     setStartDate(isoDate(addDays(parseIsoDate(startDate), days)));
   }
 
+  async function applyEmployeeOrder(employeeIds: string[]) {
+    if (!canReorder || !restaurantId || employeeIds.length < 2) return;
+    const previousAssignments = employeeRestaurants;
+    const position = new Map(employeeIds.map((id, index) => [id, index + 1]));
+
+    // Optimistic update so the rota moves immediately on screen.
+    setEmployeeRestaurants((current) =>
+      current.map((item) =>
+        item.restaurant_id === restaurantId && position.has(item.employee_id)
+          ? { ...item, display_order: position.get(item.employee_id)! }
+          : item
+      )
+    );
+
+    try {
+      setOrdering(true);
+      setError("");
+      await saveRestaurantEmployeeOrder(restaurantId, employeeIds);
+      setMessage(language === "fi" ? "Työntekijöiden järjestys tallennettu." : language === "es" ? "Orden de empleados guardado." : "Employee order saved.");
+    } catch (e) {
+      setEmployeeRestaurants(previousAssignments);
+      setError(formatError(e));
+    } finally {
+      setOrdering(false);
+    }
+  }
+
+  function moveEmployee(employeeId: string, direction: -1 | 1) {
+    const ids = restaurantEmployees.map((employee) => employee.id);
+    const index = ids.indexOf(employeeId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    void applyEmployeeOrder(ids);
+  }
+
+  function dropEmployee(targetEmployeeId: string) {
+    if (!draggedEmployeeId || draggedEmployeeId === targetEmployeeId) {
+      setDraggedEmployeeId(null);
+      return;
+    }
+    const ids = restaurantEmployees.map((employee) => employee.id);
+    const from = ids.indexOf(draggedEmployeeId);
+    const to = ids.indexOf(targetEmployeeId);
+    if (from < 0 || to < 0) return;
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    setDraggedEmployeeId(null);
+    void applyEmployeeOrder(ids);
+  }
+
   const selectedRestaurant = restaurants.find((r) => r.id === restaurantId);
 
   if (loading && !restaurants.length) return <div className="panel">{t.loading || "Loading…"}</div>;
@@ -232,7 +286,25 @@ export function RotaPage() {
                         const weekTotal = weekDates.reduce((sum, date) => sum + shiftHours(shifts[cellKey(employee.id, date)]), 0);
                         return (
                           <tr key={employee.id}>
-                            <th className="employee-col employee-name-cell">{employee.name}</th>
+                            <th
+                              className={`employee-col employee-name-cell ${draggedEmployeeId === employee.id ? "is-dragging" : ""}`}
+                              draggable={canReorder && !ordering}
+                              onDragStart={() => canReorder && setDraggedEmployeeId(employee.id)}
+                              onDragEnd={() => setDraggedEmployeeId(null)}
+                              onDragOver={(event) => { if (canReorder) event.preventDefault(); }}
+                              onDrop={() => canReorder && dropEmployee(employee.id)}
+                            >
+                              <div className="employee-name-layout">
+                                {canReorder && (
+                                  <div className="employee-order-controls no-print" title={language === "fi" ? "Muuta järjestystä" : language === "es" ? "Cambiar orden" : "Change order"}>
+                                    <span className="drag-handle" aria-hidden="true">☰</span>
+                                    <button type="button" disabled={ordering || restaurantEmployees[0]?.id === employee.id} onClick={() => moveEmployee(employee.id, -1)} aria-label="Move employee up">↑</button>
+                                    <button type="button" disabled={ordering || restaurantEmployees[restaurantEmployees.length - 1]?.id === employee.id} onClick={() => moveEmployee(employee.id, 1)} aria-label="Move employee down">↓</button>
+                                  </div>
+                                )}
+                                <span>{employee.name}</span>
+                              </div>
+                            </th>
                             {weekDates.map((date) => {
                               const key = cellKey(employee.id, date);
                               const shift = shifts[key] || EMPTY_SHIFT;
