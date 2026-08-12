@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { supabase } from "./supabase";
 import type { Restaurant } from "../types/app";
 
 export type RestaurantInput = { name:string; address:string; phone:string; email:string; color:string; logo_url:string; opening_hours:Record<string,string>; active:boolean; };

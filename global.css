@@ -63,3 +63,20 @@ code{word-break:break-all}
   .employee-main{display:grid}
   .employee-metrics{grid-template-columns:1fr}
 }
+
+/* Phase 4 — Users & permissions */
+.users-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(360px,.75fr);gap:20px}
+.user-cards{display:grid;gap:14px;margin-top:16px}
+.user-card{border:1px solid #e5e7eb;border-radius:16px;padding:16px;background:#fff}
+.user-card.inactive{opacity:.68}
+.user-card-grid{display:grid;grid-template-columns:1.1fr 1.25fr .8fr .7fr;gap:10px}
+.user-card-grid label,.user-form label{display:grid;gap:6px}
+.restaurant-assignment-box{margin-top:14px}
+.restaurant-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.user-actions{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:14px}
+.user-actions .password-input{width:min(260px,100%)}
+.user-create-panel{align-self:start;position:sticky;top:20px}
+.user-form{display:grid;gap:12px}
+@media(max-width:1150px){.users-layout{grid-template-columns:1fr}.user-create-panel{position:static}}
+@media(max-width:900px){.user-card-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.user-card-grid,.restaurant-checks{grid-template-columns:1fr}.user-actions{display:grid}.user-actions .password-input{width:100%}}

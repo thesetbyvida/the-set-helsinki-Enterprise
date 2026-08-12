@@ -6,6 +6,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { RestaurantsPage } from "./pages/RestaurantsPage";
 import { EmployeesPage } from "./pages/EmployeesPage";
+import { UsersPage } from "./pages/UsersPage";
 
 export default function App() {
   const {
@@ -75,9 +76,9 @@ export default function App() {
         if (page === "dashboard") return <DashboardPage />;
         if (page === "restaurants") return <RestaurantsPage />;
         if (page === "employees") return <EmployeesPage />;
+        if (page === "users") return <UsersPage />;
 
         const descriptions: Record<string, string> = {
-          users: "Phase 4",
           rota: "Phase 5",
           payroll: "Phase 7",
           vv: "Phase 8",

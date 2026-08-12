@@ -52,3 +52,8 @@ export interface EmployeeRestaurant {
   restaurant_id: string;
   display_order: number;
 }
+
+export interface UserRestaurant {
+  user_id: string;
+  restaurant_id: string;
+}
