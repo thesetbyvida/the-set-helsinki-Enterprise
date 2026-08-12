@@ -11,6 +11,33 @@ create table if not exists public.payroll_settings (
   updated_at timestamptz not null default now()
 );
 
+-- Defensive authorization helper: this makes Phase 7 safe even if the
+-- Phase 4 helper was not previously installed in this Supabase project.
+create or replace function public.current_user_role()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select role from public.profiles where id = auth.uid() and is_active = true;
+$$;
+
+create or replace function public.is_app_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(public.current_user_role() in ('super_admin','admin'), false);
+$$;
+
+revoke all on function public.current_user_role() from public;
+grant execute on function public.current_user_role() to authenticated;
+revoke all on function public.is_app_admin() from public;
+grant execute on function public.is_app_admin() to authenticated;
+
 alter table public.payroll_settings enable row level security;
 
 drop policy if exists "payroll settings read" on public.payroll_settings;
