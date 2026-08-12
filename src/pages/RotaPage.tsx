@@ -52,6 +52,12 @@ export function RotaPage() {
   const locale = language === "fi" ? "fi-FI" : language === "en" ? "en-GB" : "es-ES";
 
   useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(""), 2500);
+    return () => window.clearTimeout(timer);
+  }, [message]);
+
+  useEffect(() => {
     (async () => {
       try {
         setLoading(true);
@@ -250,38 +256,6 @@ export function RotaPage() {
       {error && <div className="alert no-print">{error}</div>}
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
-
-      {canReorder && restaurantEmployees.length > 1 && (
-        <div className="panel employee-order-panel no-print">
-          <div className="employee-order-panel-heading">
-            <div>
-              <h3>{language === "fi" ? "Työntekijöiden järjestys" : language === "es" ? "Orden de trabajadores" : "Employee order"}</h3>
-              <p className="muted">{language === "fi" ? "Vedä työntekijää tai käytä ↑ ↓ -painikkeita. Järjestys tallentuu automaattisesti tähän ravintolaan." : language === "es" ? "Arrastra al trabajador o usa ↑ ↓. El orden se guarda automáticamente para este restaurante." : "Drag an employee or use ↑ ↓. The order is saved automatically for this restaurant."}</p>
-            </div>
-            {ordering && <span className="order-saving">{language === "fi" ? "Tallennetaan…" : language === "es" ? "Guardando…" : "Saving…"}</span>}
-          </div>
-          <div className="employee-order-list">
-            {restaurantEmployees.map((employee, index) => (
-              <div
-                className={`employee-order-row ${draggedEmployeeId === employee.id ? "is-dragging" : ""}`}
-                key={employee.id}
-                draggable={!ordering}
-                onDragStart={() => setDraggedEmployeeId(employee.id)}
-                onDragEnd={() => setDraggedEmployeeId(null)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => dropEmployee(employee.id)}
-              >
-                <span className="employee-order-number">{index + 1}</span>
-                <strong>☰ {employee.name}</strong>
-                <div className="employee-order-row-actions">
-                  <button type="button" className="secondary" disabled={ordering || index === 0} onClick={() => moveEmployee(employee.id, -1)} aria-label="Move employee up">↑</button>
-                  <button type="button" className="secondary" disabled={ordering || index === restaurantEmployees.length - 1} onClick={() => moveEmployee(employee.id, 1)} aria-label="Move employee down">↓</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="print-rota-title">
         <h1>The Set Helsinki — {selectedRestaurant?.name || "Rota"}</h1>
