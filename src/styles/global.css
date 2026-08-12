@@ -1,0 +1,100 @@
+*{box-sizing:border-box}
+:root{font-family:Inter,Arial,Helvetica,sans-serif;color:#111827;background:#f4f6f8}
+body{margin:0;background:#f4f6f8}
+button,input,select{font:inherit}
+button{border:0;border-radius:10px;padding:10px 14px;background:#111827;color:#fff;cursor:pointer}
+button.secondary{background:#e5e7eb;color:#111827}
+input,select{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:10px;background:#fff}
+.auth-screen,.loading-screen{min-height:100vh;display:grid;place-items:center;padding:20px}
+.auth-card,.panel{background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 28px rgba(15,23,42,.08)}
+.auth-card{width:min(480px,95vw);display:grid;gap:12px}
+.alert{padding:12px;border-radius:12px;background:#fee2e2;color:#7f1d1d;border:1px solid #fecaca}
+.notice{padding:12px;border-radius:12px;background:#dcfce7;color:#14532d;border:1px solid #bbf7d0}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 28px;background:#fff;border-bottom:1px solid #e5e7eb}
+.topbar h1{margin:0}
+.topbar p{margin:4px 0 0;color:#64748b;font-size:13px}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.language-selector{width:auto}
+.main-nav{display:flex;gap:10px;flex-wrap:wrap;padding:14px 28px;background:#f8fafc;border-bottom:1px solid #e5e7eb}
+.main-nav button{background:#fff;color:#111827;border:1px solid #d1d5db}
+.main-nav button.active{background:#111827;color:#fff}
+.page-container{padding:22px 28px}
+.phase-card{margin-top:18px;padding:16px;border-radius:14px;background:#eef2ff;color:#3730a3}
+code{word-break:break-all}
+@media(max-width:760px){
+  .topbar{display:grid}
+  .topbar-actions{justify-content:space-between}
+  .page-container{padding:16px}
+  .main-nav{padding:12px 16px}
+}
+
+.restaurants-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(340px,.8fr);gap:20px}.section-header{display:flex;justify-content:space-between;align-items:center;gap:16px}.restaurant-cards{display:grid;gap:14px}.restaurant-card{display:grid;grid-template-columns:8px 1fr;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;background:#fff}.restaurant-card.inactive{opacity:.68}.restaurant-color{min-height:100%}.restaurant-card-body{padding:16px}.restaurant-title-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.restaurant-title-row h3{margin:0 0 7px}.restaurant-logo{width:56px;height:56px;border-radius:12px;object-fit:cover;border:1px solid #e5e7eb}.status-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px}.status-badge.active{background:#dcfce7;color:#166534}.status-badge.inactive{background:#e5e7eb;color:#475569}.restaurant-details{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.restaurant-details dt{font-size:11px;text-transform:uppercase;color:#64748b;margin-bottom:4px}.restaurant-details dd{margin:0;overflow-wrap:anywhere}.restaurant-actions,.form-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}button.danger{background:#991b1b}.restaurant-form-panel{align-self:start;position:sticky;top:20px}.restaurant-form{display:grid;gap:12px}.restaurant-form label{display:grid;gap:6px}.form-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}fieldset{border:1px solid #d1d5db;border-radius:14px;padding:14px}legend{padding:0 6px}.opening-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.opening-grid.compact{grid-template-columns:repeat(7,1fr);margin-top:14px}.opening-grid.compact div{display:grid;gap:3px;text-align:center;padding:7px;border-radius:8px;background:#f8fafc}.opening-grid.compact span{font-size:11px;color:#475569}.checkbox-label{display:flex!important;grid-template-columns:auto 1fr!important;align-items:center}.checkbox-label input{width:auto}.muted{color:#64748b;font-size:13px}@media(max-width:1100px){.restaurants-layout{grid-template-columns:1fr}.restaurant-form-panel{position:static}}@media(max-width:760px){.restaurant-details,.form-columns,.opening-grid{grid-template-columns:1fr}.opening-grid.compact{grid-template-columns:repeat(2,1fr)}}
+
+.employees-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(360px,.85fr);gap:20px}
+.employee-filters{display:flex;gap:10px;min-width:min(520px,100%)}
+.employee-cards{display:grid;gap:14px}
+.employee-card{border:1px solid #e5e7eb;border-radius:16px;padding:16px;background:#fff}
+.employee-card.inactive{opacity:.68}
+.employee-main{display:flex;gap:14px}
+.employee-avatar{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:#111827;color:#fff;font-weight:700;flex:0 0 auto}
+.employee-info{min-width:0;flex:1}
+.employee-title-row{display:flex;justify-content:space-between;gap:12px}
+.employee-title-row h3{margin:0}
+.employee-title-row p{margin:4px 0 0;color:#64748b}
+.employee-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:14px 0}
+.employee-metrics div{padding:10px;border-radius:12px;background:#f8fafc;min-width:0}
+.employee-metrics span{display:block;font-size:11px;color:#64748b;margin-bottom:4px}
+.employee-metrics strong{display:block;overflow-wrap:anywhere}
+.employee-contact{display:flex;gap:18px;flex-wrap:wrap;color:#475569;font-size:13px}
+.badge-row{margin-top:12px}
+.employee-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.employee-form-panel{align-self:start;position:sticky;top:20px}
+.employee-form{display:grid;gap:12px}
+.employee-form label{display:grid;gap:6px}
+@media(max-width:1150px){
+  .employees-layout{grid-template-columns:1fr}
+  .employee-form-panel{position:static}
+}
+@media(max-width:900px){
+  .employee-metrics{grid-template-columns:repeat(2,1fr)}
+  .employee-filters{display:grid}
+}
+@media(max-width:620px){
+  .employee-main{display:grid}
+  .employee-metrics{grid-template-columns:1fr}
+}
+
+/* Phase 4 — Users & permissions */
+.users-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(360px,.75fr);gap:20px}
+.user-cards{display:grid;gap:14px;margin-top:16px}
+.user-card{border:1px solid #e5e7eb;border-radius:16px;padding:16px;background:#fff}
+.user-card.inactive{opacity:.68}
+.user-card-grid{display:grid;grid-template-columns:1.1fr 1.25fr .8fr .7fr;gap:10px}
+.user-card-grid label,.user-form label{display:grid;gap:6px}
+.restaurant-assignment-box{margin-top:14px}
+.restaurant-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.user-actions{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:14px}
+.user-actions .password-input{width:min(260px,100%)}
+.user-create-panel{align-self:start;position:sticky;top:20px}
+.user-form{display:grid;gap:12px}
+@media(max-width:1150px){.users-layout{grid-template-columns:1fr}.user-create-panel{position:static}}
+@media(max-width:900px){.user-card-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.user-card-grid,.restaurant-checks{grid-template-columns:1fr}.user-actions{display:grid}.user-actions .password-input{width:100%}}
+
+/* Phase 5 — 3-week rota */
+.rota-page{display:grid;gap:16px}.rota-toolbar{display:flex;justify-content:space-between;gap:20px;align-items:end}.rota-toolbar h2{margin:0 0 4px}.rota-toolbar-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.rota-toolbar-controls label{display:grid;gap:5px;min-width:150px}.rota-toolbar-controls label span{font-size:11px;color:#64748b}.rota-toolbar-controls button{white-space:nowrap}.rota-weeks{display:grid;gap:18px}.rota-week{padding:0;overflow:visible}.rota-week-heading{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #e5e7eb}.rota-week-heading h3{margin:0}.rota-week-heading span{font-size:12px;color:#64748b}.rota-table-scroll{max-width:100%;overflow:auto;max-height:72vh}.rota-table{border-collapse:separate;border-spacing:0;min-width:1500px;width:100%;background:#fff}.rota-table th,.rota-table td{border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;vertical-align:top}.rota-table thead th{position:sticky;top:0;z-index:20;background:#f8fafc;padding:9px 8px;text-align:center;min-width:178px}.rota-table thead th.sunday{background:#fff1f2;color:#9f1239}.rota-table thead th .day-name{display:block;font-size:12px;text-transform:capitalize;margin-bottom:3px}.rota-table .employee-col{position:sticky;left:0;z-index:15;min-width:180px;max-width:180px;background:#fff;text-align:left}.rota-table thead .employee-col{z-index:30;background:#f8fafc}.rota-table .employee-name-cell{padding:13px 12px;font-size:13px}.rota-table .total-col{position:sticky;right:0;z-index:14;min-width:88px;max-width:88px;background:#f8fafc;text-align:center;padding:13px 8px}.rota-table thead .total-col{z-index:30}.rota-table td{padding:7px;min-width:178px;background:#fff}.rota-table td.dirty{background:#fffbeb}.shift-editor{display:grid;gap:6px}.shift-time-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:4px}.shift-time-row input{padding:7px 5px;font-size:12px}.shift-meta-row{display:grid;grid-template-columns:64px 1fr;gap:5px}.shift-meta-row select,.shift-meta-row input{padding:7px 6px;font-size:12px}.shift-editor small{text-align:right;color:#475569;min-height:14px}.print-shift{display:none}.print-rota-title{display:none}
+@media(max-width:950px){.rota-toolbar{display:grid}.rota-table-scroll{max-height:68vh}.rota-toolbar-controls{align-items:stretch}.rota-toolbar-controls label{min-width:130px}}
+
+@media print{
+  @page{size:A4 landscape;margin:7mm}
+  body{background:#fff!important}.topbar,.main-nav,.no-print{display:none!important}.page-container{padding:0!important}.rota-page{display:block}.print-rota-title{display:block;text-align:center;margin:0 0 5mm}.print-rota-title h1{font-size:16pt;margin:0 0 2mm}.print-rota-title p{margin:0;font-size:9pt}.rota-weeks{display:block}.rota-week{box-shadow:none!important;border-radius:0!important;padding:0!important;margin:0!important;break-after:page;page-break-after:always}.rota-week:last-child{break-after:auto;page-break-after:auto}.rota-week-heading{padding:2mm 1mm;border:0}.rota-week-heading h3{font-size:11pt}.rota-week-heading span{font-size:8pt}.rota-table-scroll{overflow:visible!important;max-height:none!important}.rota-table{min-width:0!important;width:100%!important;table-layout:fixed;border-collapse:collapse}.rota-table th,.rota-table td{position:static!important;border:1px solid #9ca3af!important;min-width:0!important;max-width:none!important;padding:1.2mm!important;background:#fff!important;color:#111!important}.rota-table thead th{font-size:7pt}.rota-table thead th.sunday{background:#fef2f2!important}.rota-table .employee-col{width:16%!important;font-size:8pt}.rota-table .total-col{width:8%!important;font-size:8pt}.rota-table td{height:12mm;text-align:center;vertical-align:middle;font-size:7.5pt}.print-shift{display:grid!important;gap:.8mm;line-height:1.15}.print-shift strong{font-size:8pt}.print-code{font-weight:700}.print-note{font-size:6.5pt;overflow-wrap:anywhere}.day-name{font-size:7pt!important}.rota-table thead th:not(.employee-col):not(.total-col){width:10.85%!important}
+}
+
+
+/* Phase 6 — HourCalc / TES engine */
+.hourcalc-page{display:grid;gap:16px}.hourcalc-toolbar{display:flex;justify-content:space-between;gap:20px;align-items:end}.hourcalc-toolbar h2{margin:0 0 4px}.hourcalc-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.hourcalc-controls label{display:grid;gap:5px;min-width:150px}.hourcalc-controls label span{font-size:11px;color:#64748b}.hourcalc-table-wrap{overflow:auto;padding:0}.hourcalc-table{width:100%;border-collapse:separate;border-spacing:0;min-width:1180px}.hourcalc-table th,.hourcalc-table td{border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;padding:10px 9px;text-align:right;white-space:nowrap}.hourcalc-table th{position:sticky;top:0;background:#f8fafc;z-index:2;font-size:12px}.hourcalc-table th:first-child,.hourcalc-table td:first-child{position:sticky;left:0;text-align:left;background:#fff;z-index:1}.hourcalc-table th:first-child{background:#f8fafc;z-index:3}.hourcalc-note{font-size:13px;color:#475569}.print-hourcalc-title{display:none}@media(max-width:950px){.hourcalc-toolbar{display:grid}.hourcalc-controls{align-items:stretch}}
+@media print{.hourcalc-page{display:block}.print-hourcalc-title{display:block;text-align:center;margin-bottom:5mm}.print-hourcalc-title h1{font-size:15pt;margin:0}.print-hourcalc-title p{font-size:9pt;margin:2mm 0 0}.hourcalc-table-wrap{box-shadow:none!important;padding:0!important;overflow:visible!important}.hourcalc-table{min-width:0!important;width:100%!important;border-collapse:collapse}.hourcalc-table th,.hourcalc-table td{position:static!important;border:1px solid #9ca3af!important;padding:1.5mm!important;font-size:6.8pt!important}.hourcalc-table th:first-child,.hourcalc-table td:first-child{text-align:left!important}}
+
+/* Phase 7 — Payroll 21st–20th */
+.payroll-page{display:grid;gap:16px}.payroll-toolbar{display:flex;justify-content:space-between;gap:20px;align-items:end}.payroll-toolbar h2,.payroll-rates h3{margin:0 0 4px}.payroll-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.payroll-controls label,.payroll-rate-grid label{display:grid;gap:5px;min-width:150px}.payroll-controls label span,.payroll-rate-grid label span{font-size:11px;color:#64748b}.payroll-rates{display:grid;gap:14px}.payroll-rate-grid{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr)) auto;gap:10px;align-items:end}.payroll-table-wrap{overflow:auto;padding:0}.payroll-table{width:100%;border-collapse:separate;border-spacing:0;min-width:2050px}.payroll-table th,.payroll-table td{border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;padding:9px 8px;text-align:right;white-space:nowrap}.payroll-table th{position:sticky;top:0;background:#f8fafc;z-index:2;font-size:11px}.payroll-table th:first-child,.payroll-table td:first-child{position:sticky;left:0;text-align:left;background:#fff;z-index:1}.payroll-table th:first-child{background:#f8fafc;z-index:3}.payroll-table tfoot td{font-weight:700;background:#f8fafc}.payroll-table tfoot td:first-child{position:static;text-align:right}.payroll-footnote{font-size:13px;color:#475569}.print-payroll-title{display:none}@media(max-width:1050px){.payroll-toolbar{display:grid}.payroll-rate-grid{grid-template-columns:repeat(2,1fr)}.payroll-controls{align-items:stretch}}@media(max-width:620px){.payroll-rate-grid{grid-template-columns:1fr}}
+@media print{.payroll-page{display:block}.print-payroll-title{display:block;text-align:center;margin-bottom:5mm}.print-payroll-title h1{font-size:15pt;margin:0}.print-payroll-title p{font-size:9pt;margin:2mm 0 0}.payroll-table-wrap{box-shadow:none!important;padding:0!important;overflow:visible!important}.payroll-table{min-width:0!important;width:100%!important;border-collapse:collapse}.payroll-table th,.payroll-table td{position:static!important;border:1px solid #9ca3af!important;padding:.8mm!important;font-size:5.1pt!important}.payroll-table th:first-child,.payroll-table td:first-child{text-align:left!important}.payroll-table tfoot td{background:#fff!important}}
