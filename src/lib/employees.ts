@@ -125,19 +125,14 @@ export async function saveEmployeeRestaurants(employeeId: string, restaurantIds:
 
 export async function saveRestaurantEmployeeOrder(restaurantId: string, employeeIds: string[]) {
   if (!supabase) throw new Error("Supabase is not configured");
+  if (!restaurantId || !employeeIds.length) return;
 
-  // Keep the same order for this restaurant across all three rota weeks.
-  // Updates are intentionally scoped by both restaurant_id and employee_id.
-  const results = await Promise.all(
-    employeeIds.map((employeeId, index) =>
-      supabase
-        .from("employee_restaurants")
-        .update({ display_order: index + 1 })
-        .eq("restaurant_id", restaurantId)
-        .eq("employee_id", employeeId)
-    )
-  );
-
-  const failed = results.find((result) => result.error);
-  if (failed?.error) throw failed.error;
+  // Enterprise 3.2: save the complete order atomically through one RPC.
+  // The database function validates that the caller is an active admin/super_admin,
+  // then updates every display_order in a single transaction.
+  const { error } = await supabase.rpc("set_restaurant_employee_order", {
+    p_restaurant_id: restaurantId,
+    p_employee_ids: employeeIds,
+  });
+  if (error) throw error;
 }

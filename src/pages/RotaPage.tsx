@@ -179,6 +179,10 @@ export function RotaPage() {
       setOrdering(true);
       setError("");
       await saveRestaurantEmployeeOrder(restaurantId, employeeIds);
+      // Re-read the database after saving. This makes the screen reflect the
+      // persisted order instead of relying only on the optimistic React state.
+      const freshAssignments = await listEmployeeRestaurants();
+      setEmployeeRestaurants(freshAssignments);
       setMessage(language === "fi" ? "Työntekijöiden järjestys tallennettu." : language === "es" ? "Orden de empleados guardado." : "Employee order saved.");
     } catch (e) {
       setEmployeeRestaurants(previousAssignments);
@@ -252,15 +256,23 @@ export function RotaPage() {
           <div className="employee-order-panel-heading">
             <div>
               <h3>{language === "fi" ? "Työntekijöiden järjestys" : language === "es" ? "Orden de trabajadores" : "Employee order"}</h3>
-              <p className="muted">{language === "fi" ? "Muuta järjestystä nuolilla. Järjestys tallentuu automaattisesti tähän ravintolaan." : language === "es" ? "Usa las flechas para cambiar el orden. Se guarda automáticamente para este restaurante." : "Use the arrows to change the order. It is saved automatically for this restaurant."}</p>
+              <p className="muted">{language === "fi" ? "Vedä työntekijää tai käytä ↑ ↓ -painikkeita. Järjestys tallentuu automaattisesti tähän ravintolaan." : language === "es" ? "Arrastra al trabajador o usa ↑ ↓. El orden se guarda automáticamente para este restaurante." : "Drag an employee or use ↑ ↓. The order is saved automatically for this restaurant."}</p>
             </div>
             {ordering && <span className="order-saving">{language === "fi" ? "Tallennetaan…" : language === "es" ? "Guardando…" : "Saving…"}</span>}
           </div>
           <div className="employee-order-list">
             {restaurantEmployees.map((employee, index) => (
-              <div className="employee-order-row" key={employee.id}>
+              <div
+                className={`employee-order-row ${draggedEmployeeId === employee.id ? "is-dragging" : ""}`}
+                key={employee.id}
+                draggable={!ordering}
+                onDragStart={() => setDraggedEmployeeId(employee.id)}
+                onDragEnd={() => setDraggedEmployeeId(null)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => dropEmployee(employee.id)}
+              >
                 <span className="employee-order-number">{index + 1}</span>
-                <strong>{employee.name}</strong>
+                <strong>☰ {employee.name}</strong>
                 <div className="employee-order-row-actions">
                   <button type="button" className="secondary" disabled={ordering || index === 0} onClick={() => moveEmployee(employee.id, -1)} aria-label="Move employee up">↑</button>
                   <button type="button" className="secondary" disabled={ordering || index === restaurantEmployees.length - 1} onClick={() => moveEmployee(employee.id, 1)} aria-label="Move employee down">↓</button>
@@ -322,8 +334,8 @@ export function RotaPage() {
                                 {canReorder && (
                                   <div className="employee-order-controls no-print" title={language === "fi" ? "Muuta järjestystä" : language === "es" ? "Cambiar orden" : "Change order"}>
                                     <span className="drag-handle" aria-hidden="true">☰</span>
-                                    <button type="button" disabled={ordering || restaurantEmployees[0]?.id === employee.id} onClick={() => moveEmployee(employee.id, -1)} aria-label="Move employee up">↑</button>
-                                    <button type="button" disabled={ordering || restaurantEmployees[restaurantEmployees.length - 1]?.id === employee.id} onClick={() => moveEmployee(employee.id, 1)} aria-label="Move employee down">↓</button>
+                                    <button type="button" disabled={ordering || restaurantEmployees[0]?.id === employee.id} onClick={(event) => { event.stopPropagation(); moveEmployee(employee.id, -1); }} aria-label="Move employee up" title="Move up">↑</button>
+                                    <button type="button" disabled={ordering || restaurantEmployees[restaurantEmployees.length - 1]?.id === employee.id} onClick={(event) => { event.stopPropagation(); moveEmployee(employee.id, 1); }} aria-label="Move employee down" title="Move down">↓</button>
                                   </div>
                                 )}
                                 <span>{employee.name}</span>
