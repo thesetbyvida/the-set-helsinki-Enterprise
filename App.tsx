@@ -8,6 +8,7 @@ import { RestaurantsPage } from "./pages/RestaurantsPage";
 import { EmployeesPage } from "./pages/EmployeesPage";
 import { UsersPage } from "./pages/UsersPage";
 import { RotaPage } from "./pages/RotaPage";
+import { HourCalcPage } from "./pages/HourCalcPage";
 
 export default function App() {
   const {
@@ -79,6 +80,7 @@ export default function App() {
         if (page === "employees") return <EmployeesPage />;
         if (page === "users") return <UsersPage />;
         if (page === "rota") return <RotaPage />;
+        if (page === "hourcalc") return <HourCalcPage />;
 
         const descriptions: Record<string, string> = {
           payroll: "Phase 7",

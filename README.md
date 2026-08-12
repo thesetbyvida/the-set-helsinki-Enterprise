@@ -1,55 +1,49 @@
-# The Set Helsinki Enterprise 2.0 — Phase 5: 3-week Rota
+# The Set Helsinki Enterprise 2.0 — Phase 6: HourCalc / TES engine
 
-Entrega acumulativa: incluye Fases 1, 2, 3, 4 y 5.
+Entrega acumulativa: incluye Fases 1–6.
 
-## Fase 5 — Rota de 3 semanas
+## Phase 6 — HourCalc
 
-- Rota real de **21 días**, siempre empezando en lunes.
-- Selector de restaurante y selector de fecha de inicio.
-- Botones para periodo anterior/siguiente de 3 semanas.
-- Empleados activos filtrados por restaurante y respetando `display_order`.
-- Edición por día: **Alku / Start**, **Loppu / End**, **Koodi / Code** y **Huomio / Note**.
-- Turnos que cruzan medianoche se calculan correctamente (por ejemplo 22:00–03:30 = 5.5 h).
-- Códigos iniciales: `S`, `VL`, `VV`, `V`, `VP`.
-  - `S` y `VL` = 7.5 h.
-  - `VV`, `V` y `VP` = 0 h en horas trabajadas.
-- Total semanal por empleado.
-- Cambios marcados visualmente y guardado masivo.
-- Employee = lectura; Manager/Admin/Super Admin = edición, según RLS.
+Se añade un motor de cálculo separado del Payroll para validar las horas antes de convertirlas en dinero.
 
-## Mejora de usabilidad solicitada
+### Cálculos incluidos
 
-- **La fila de fechas queda fija** mientras bajas por la lista de empleados.
-- **El nombre del empleado queda fijo** mientras haces scroll horizontal.
-- El nombre del día aparece junto a la fecha.
-- En impresión se muestran las **horas reales de entrada y salida**, por ejemplo `16:00–23:30`, no solamente `7.5`.
-- Código y nota también aparecen en impresión.
-- Cada semana se imprime en su propia página **A4 horizontal**.
+- Horas base y horas realmente trabajadas.
+- **Evening / iltalisä:** 18:00–24:00.
+- **Night / yölisä:** 00:00–06:00.
+- Turnos que cruzan medianoche.
+- **Sunday:** sábado→domingo cuenta domingo solamente desde 00:00; si el turno empieza el domingo y termina el lunes, el premium de domingo sigue durante ese turno, según la regla operativa solicitada para The Set Helsinki.
+- **Holiday:** configurable por fecha y franja horaria.
+- **100% total:** unión de Sunday + Holiday para evitar doble conteo si coinciden.
+- **Aatto-lisä:** configurable por fecha/franja horaria.
+- `S` = 7.5 h; `VL` = 7.5 h; `VV` = 1 día separado; `V/VP` = 0 h.
+
+### Nueva página HourCalc
+
+- Selector de restaurante.
+- Selector de periodo de 3 semanas.
+- Navegación anterior/siguiente.
+- Tabla por empleado con Base, Worked, Evening, Night, Sunday, Holiday, 100%, Aatto, S, VL, VV y V/VP.
+- Cabecera y empleado sticky.
+- Impresión A4 horizontal.
 
 ## Base de datos
 
-Si ya tienes Fases 1–4 instaladas, ejecuta solamente:
+Ejecuta después de `005_rota.sql`:
 
 ```text
-supabase/migrations/005_rota.sql
+supabase/migrations/006_hourcalc.sql
 ```
 
-Si instalas desde cero:
+La migración crea `tes_special_days`. No se fijan en el código fechas o importes del convenio: los días festivos y aatto se guardan como datos para que la app se pueda mantener cuando cambien reglas o fechas.
 
-```text
-001_foundation.sql
-002_restaurants.sql
-003_employees.sql
-004_users_permissions.sql
-005_rota.sql
+Ejemplo de fila de día especial (solo ejemplo; usa la regla oficial que corresponda):
+
+```sql
+insert into public.tes_special_days(date,kind,label,premium_start,premium_end)
+values ('2026-12-25','holiday','Christmas Day','00:00','00:00')
+on conflict do nothing;
 ```
-
-La migración crea:
-
-- `rota_periods`
-- `rota_shifts`
-- RLS para lectura por restaurante.
-- Escritura de Rota para `manager`, `admin` y `super_admin`.
 
 ## Despliegue
 
@@ -58,13 +52,8 @@ npm install
 npm run build
 ```
 
-En Vercel:
-
-- Framework: Vite
-- Build Command: `npm run build`
-- Output Directory: `dist`
-- Root Directory: `./`
+Vercel: Framework Vite, Build Command `npm run build`, Output Directory `dist`.
 
 ## Siguiente fase
 
-**Phase 6:** motor de cálculo TES / HourCalc para evening, night, Sunday, holiday y aatto-lisä, preparando Payroll.
+**Phase 7:** Payroll 21–20, tarifas por empleado, compensaciones TES y selector de periodos históricos/futuros.

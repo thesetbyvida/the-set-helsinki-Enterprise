@@ -8,6 +8,7 @@ type PageId =
   | "employees"
   | "users"
   | "rota"
+  | "hourcalc"
   | "payroll"
   | "vv"
   | "reports"
@@ -27,6 +28,7 @@ export function AppShell({ children }: AppShellProps) {
     ["employees", t.employees],
     ["users", t.users],
     ["rota", t.rota],
+    ["hourcalc", t.hourCalc || "HourCalc"],
     ["payroll", t.payroll],
     ["vv", t.vv],
     ["reports", t.reports],
