@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { listRestaurants } from "../lib/restaurants";
+import { formatError } from "../lib/errors";
 import {
   changeManagedPassword,
   createManagedUser,
@@ -43,7 +44,7 @@ export function UsersPage() {
   }
 
   useEffect(() => {
-    reload().catch((e) => setError(e.message || String(e)));
+    reload().catch((e) => setError(formatError(e)));
   }, []);
 
   const assignmentMap = useMemo(() => {
@@ -97,7 +98,7 @@ export function UsersPage() {
       setMessage(t.userCreated);
       await reload();
     } catch (e: any) {
-      setError(e.message || String(e));
+      setError(formatError(e));
     } finally {
       setBusy(false);
     }
@@ -117,7 +118,7 @@ export function UsersPage() {
       setMessage(t.userSaved);
       await reload();
     } catch (e: any) {
-      setError(e.message || String(e));
+      setError(formatError(e));
     } finally {
       setBusy(false);
     }
@@ -137,7 +138,7 @@ export function UsersPage() {
       setPasswords((prev) => ({ ...prev, [userId]: "" }));
       setMessage(t.passwordChangedAdmin);
     } catch (e: any) {
-      setError(e.message || String(e));
+      setError(formatError(e));
     } finally {
       setBusy(false);
     }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { listRestaurants } from "../lib/restaurants";
 import { listEmployeeRestaurants, listEmployees } from "../lib/employees";
+import { formatError } from "../lib/errors";
 import {
   addDays,
   displayTime,
@@ -62,7 +63,7 @@ export function RotaPage() {
         setEmployeeRestaurants(assignmentData);
         if (activeRestaurants.length) setRestaurantId((current) => current || activeRestaurants[0].id);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(formatError(e));
       } finally {
         setLoading(false);
       }
@@ -112,7 +113,7 @@ export function RotaPage() {
         }
         setShifts(next);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(formatError(e));
       } finally {
         setLoading(false);
       }
@@ -142,7 +143,7 @@ export function RotaPage() {
       setDirty(new Set());
       setMessage(t.rotaSaved || "Rota saved.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     } finally {
       setSaving(false);
     }

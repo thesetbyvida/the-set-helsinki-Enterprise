@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { listRestaurants } from "../lib/restaurants";
 import { listEmployeeRestaurants, listEmployees } from "../lib/employees";
+import { formatError } from "../lib/errors";
 import {
   aggregatePayrollHours,
   calculatePayrollRow,
@@ -47,7 +48,7 @@ export function PayrollPage() {
         setEmployees(e.filter((x) => x.active));
         setAssignments(a);
         if (active.length) setRestaurantId(active[0].id);
-      } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setError(formatError(e)); }
     })();
   }, []);
 
@@ -58,7 +59,7 @@ export function PayrollPage() {
         const s = await getPayrollSettings(restaurantId);
         setSettings(s);
         setPeriod(payrollPeriodForDate(parseIsoDate(period.start), s.period_start_day || 21));
-      } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setError(formatError(e)); }
     })();
     // restaurant change intentionally preserves the month being viewed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,7 +81,7 @@ export function PayrollPage() {
         ]);
         const byEmployee = aggregatePayrollHours(shifts, specialDays);
         setRows(visibleEmployees.map((employee) => calculatePayrollRow(employee, byEmployee.get(employee.id) || emptyTes(), settings)));
-      } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setError(formatError(e)); }
       finally { setLoading(false); }
     })();
   }, [restaurantId, period.start, period.end, visibleEmployees, settings]);
@@ -97,7 +98,7 @@ export function PayrollPage() {
       setSavingSettings(true); setError(""); setNotice("");
       await savePayrollSettings(settings);
       setNotice(t.payrollSettingsSaved || "Payroll settings saved.");
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { setError(formatError(e)); }
     finally { setSavingSettings(false); }
   }
 

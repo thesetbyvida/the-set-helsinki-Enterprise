@@ -6,6 +6,7 @@ import { addDays, isoDate, mondayOf, parseIsoDate } from "../lib/rota";
 import { calculateEmployees, listShiftsForRange, listSpecialDays } from "../lib/hourcalc";
 import { emptyTes, type TesBreakdown } from "../lib/tes";
 import type { Employee, EmployeeRestaurant, Restaurant } from "../types/app";
+import { formatError } from "../lib/errors";
 
 function h(value: number) {
   return value.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
@@ -34,7 +35,7 @@ export function HourCalcPage() {
         setAssignments(a);
         if (active.length) setRestaurantId(active[0].id);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(formatError(e));
       }
     })();
   }, []);
@@ -51,7 +52,7 @@ export function HourCalcPage() {
         ]);
         setRows(calculateEmployees(shifts, specialDays));
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(formatError(e));
       } finally {
         setLoading(false);
       }

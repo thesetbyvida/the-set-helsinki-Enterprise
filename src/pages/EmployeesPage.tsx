@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { listRestaurants } from "../lib/restaurants";
+import { formatError } from "../lib/errors";
 import {
   createEmployee,
   deleteEmployee,
@@ -57,7 +58,7 @@ export function EmployeesPage() {
       setRestaurants(restaurantRows);
       setLinks(linkRows);
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      setError(formatError(error));
     } finally {
       setLoading(false);
     }
@@ -154,7 +155,7 @@ export function EmployeesPage() {
       cancelEdit();
       await refresh();
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      setError(formatError(error));
     }
   }
 
@@ -164,7 +165,7 @@ export function EmployeesPage() {
       await setEmployeeActive(employee.id, !employee.active);
       await refresh();
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      setError(formatError(error));
     }
   }
 
@@ -177,7 +178,7 @@ export function EmployeesPage() {
       setMessage(t.employeeDeleted);
       await refresh();
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      setError(formatError(error));
     }
   }
 
