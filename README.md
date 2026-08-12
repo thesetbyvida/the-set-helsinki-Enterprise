@@ -1,59 +1,37 @@
-# The Set Helsinki Enterprise 2.0 — Phase 6: HourCalc / TES engine
+# The Set Helsinki Enterprise 2.0 — Phase 7
 
-Entrega acumulativa: incluye Fases 1–6.
+Phase 7 adds the production payroll view on top of Phases 1–6.
 
-## Phase 6 — HourCalc
+## New in Phase 7
 
-Se añade un motor de cálculo separado del Payroll para validar las horas antes de convertirlas en dinero.
+- Payroll selector with previous/future periods; default company cycle is **21st–20th**.
+- Restaurant selector for admins/managers.
+- Per-employee breakdown: base, evening, night, Sunday, holiday, non-duplicated 100%, aatto, S, VL and VV.
+- Money calculation for hourly employees and monthly-salary base support.
+- Sunday/holiday **100% premium** uses each employee's hourly rate and does not double-pay an hour that is both Sunday and holiday.
+- Evening/night/aatto euro supplements are configurable per restaurant in `payroll_settings` instead of being hard-coded.
+- Printable landscape payroll with totals.
+- Existing TES engine rules from Phase 6 are reused, including overnight shifts and S/VL/VV codes.
 
-### Cálculos incluidos
+## Supabase migration
 
-- Horas base y horas realmente trabajadas.
-- **Evening / iltalisä:** 18:00–24:00.
-- **Night / yölisä:** 00:00–06:00.
-- Turnos que cruzan medianoche.
-- **Sunday:** sábado→domingo cuenta domingo solamente desde 00:00; si el turno empieza el domingo y termina el lunes, el premium de domingo sigue durante ese turno, según la regla operativa solicitada para The Set Helsinki.
-- **Holiday:** configurable por fecha y franja horaria.
-- **100% total:** unión de Sunday + Holiday para evitar doble conteo si coinciden.
-- **Aatto-lisä:** configurable por fecha/franja horaria.
-- `S` = 7.5 h; `VL` = 7.5 h; `VV` = 1 día separado; `V/VP` = 0 h.
+Run these migrations in order if the database is new. For an existing Phase 6 database, only run:
 
-### Nueva página HourCalc
+`supabase/migrations/007_payroll.sql`
 
-- Selector de restaurante.
-- Selector de periodo de 3 semanas.
-- Navegación anterior/siguiente.
-- Tabla por empleado con Base, Worked, Evening, Night, Sunday, Holiday, 100%, Aatto, S, VL, VV y V/VP.
-- Cabecera y empleado sticky.
-- Impresión A4 horizontal.
+The same migration is also copied to the project root as `007_payroll.sql`.
 
-## Base de datos
+### Important
 
-Ejecuta después de `005_rota.sql`:
+The migration intentionally starts evening/night/aatto rates at **€0.00**. After deploying, open Payroll as Admin/Super Admin and enter the official current TES euro rates used by the company. This avoids embedding outdated collective-agreement rates in application code.
 
-```text
-supabase/migrations/006_hourcalc.sql
-```
-
-La migración crea `tes_special_days`. No se fijan en el código fechas o importes del convenio: los días festivos y aatto se guardan como datos para que la app se pueda mantener cuando cambien reglas o fechas.
-
-Ejemplo de fila de día especial (solo ejemplo; usa la regla oficial que corresponda):
-
-```sql
-insert into public.tes_special_days(date,kind,label,premium_start,premium_end)
-values ('2026-12-25','holiday','Christmas Day','00:00','00:00')
-on conflict do nothing;
-```
-
-## Despliegue
+## Build
 
 ```bash
 npm install
 npm run build
 ```
 
-Vercel: Framework Vite, Build Command `npm run build`, Output Directory `dist`.
+## Next phase
 
-## Siguiente fase
-
-**Phase 7:** Payroll 21–20, tarifas por empleado, compensaciones TES y selector de periodos históricos/futuros.
+Phase 8: VV / vuosivapaa + 112.5 h overtime / hour-bank tracking.
