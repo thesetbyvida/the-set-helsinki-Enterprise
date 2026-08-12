@@ -247,6 +247,30 @@ export function RotaPage() {
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
 
+      {canReorder && restaurantEmployees.length > 1 && (
+        <div className="panel employee-order-panel no-print">
+          <div className="employee-order-panel-heading">
+            <div>
+              <h3>{language === "fi" ? "Työntekijöiden järjestys" : language === "es" ? "Orden de trabajadores" : "Employee order"}</h3>
+              <p className="muted">{language === "fi" ? "Muuta järjestystä nuolilla. Järjestys tallentuu automaattisesti tähän ravintolaan." : language === "es" ? "Usa las flechas para cambiar el orden. Se guarda automáticamente para este restaurante." : "Use the arrows to change the order. It is saved automatically for this restaurant."}</p>
+            </div>
+            {ordering && <span className="order-saving">{language === "fi" ? "Tallennetaan…" : language === "es" ? "Guardando…" : "Saving…"}</span>}
+          </div>
+          <div className="employee-order-list">
+            {restaurantEmployees.map((employee, index) => (
+              <div className="employee-order-row" key={employee.id}>
+                <span className="employee-order-number">{index + 1}</span>
+                <strong>{employee.name}</strong>
+                <div className="employee-order-row-actions">
+                  <button type="button" className="secondary" disabled={ordering || index === 0} onClick={() => moveEmployee(employee.id, -1)} aria-label="Move employee up">↑</button>
+                  <button type="button" className="secondary" disabled={ordering || index === restaurantEmployees.length - 1} onClick={() => moveEmployee(employee.id, 1)} aria-label="Move employee down">↓</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="print-rota-title">
         <h1>The Set Helsinki — {selectedRestaurant?.name || "Rota"}</h1>
         <p>{new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", year: "numeric" }).format(parseIsoDate(startDate))} – {new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", year: "numeric" }).format(addDays(parseIsoDate(startDate), 20))}</p>
