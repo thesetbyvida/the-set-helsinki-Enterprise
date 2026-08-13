@@ -12,6 +12,7 @@ import { HourCalcPage } from "./pages/HourCalcPage";
 import { PayrollPage } from "./pages/PayrollPage";
 import { VvPage } from "./pages/VvPage";
 import EmployeePortalPage from "./pages/EmployeePortalPage";
+import VacationsPage from "./pages/VacationsPage";
 
 export default function App() {
   const {

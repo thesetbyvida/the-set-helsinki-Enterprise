@@ -182,3 +182,28 @@ button.small { padding:7px 10px; min-height:auto; }
 }
 .employee-action-card h3{margin:0 0 6px}
 .employee-action-card p{margin:0;color:#64748b}
+
+
+/* Enterprise 3.7 Vacations & Requests */
+.request-form-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(160px,1fr));
+  gap:14px;
+}
+.request-form-grid label{display:flex;flex-direction:column;gap:6px;font-weight:600}
+.request-message{grid-column:1/-1}
+.request-form-actions{grid-column:1/-1;display:flex;justify-content:flex-end}
+.request-actions{display:flex;gap:8px;justify-content:flex-end;white-space:nowrap}
+.status-pill{
+  display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;
+  font-size:12px;font-weight:700;text-transform:capitalize;background:#f1f5f9;
+}
+.status-approved{background:#dcfce7}
+.status-rejected{background:#fee2e2}
+.status-pending{background:#fef3c7}
+.status-cancelled{background:#e5e7eb}
+button.small{padding:6px 9px;font-size:12px}
+@media (max-width:900px){
+  .request-form-grid{grid-template-columns:1fr}
+  .request-message,.request-form-actions{grid-column:auto}
+}
