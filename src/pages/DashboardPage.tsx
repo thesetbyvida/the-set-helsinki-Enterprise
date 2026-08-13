@@ -16,7 +16,7 @@ import {
   type PayrollPeriod,
 } from "../lib/payroll";
 import { supabase } from "../lib/supabase";
-import type { Employee, Restaurant } from "../types/app";
+import type { Restaurant } from "../types/app";
 
 type DailySale = {
   id?: string;
@@ -27,14 +27,32 @@ type DailySale = {
   notes?: string | null;
 };
 
+type PosSale = {
+  restaurant_id: string;
+  business_date: string;
+  gross_amount: number;
+  net_amount: number;
+};
+
+type EffectiveDailySale = {
+  restaurant_id: string;
+  sales_date: string;
+  gross_sales: number;
+  net_sales: number;
+  source: "POS" | "Manual";
+};
+
 type RestaurantSummary = {
   restaurant: Restaurant;
   employees: number;
   workedHours: number;
   laborCost: number;
-  sales: number;
+  grossSales: number;
+  netSales: number;
   productivity: number;
   laborPercent: number;
+  laborPerHour: number;
+  salesSource: "POS" | "Manual" | "No sales";
 };
 
 const eur = new Intl.NumberFormat("fi-FI", { style: "currency", currency: "EUR" });
@@ -49,6 +67,10 @@ function dateLabel(value: string) {
     .format(new Date(`${value}T12:00:00`));
 }
 
+function posKey(restaurantId: string, date: string) {
+  return `${restaurantId}::${date}`;
+}
+
 export function DashboardPage() {
   const { profile, t } = useApp();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -56,6 +78,7 @@ export function DashboardPage() {
   const [period, setPeriod] = useState<PayrollPeriod>(() => payrollPeriodForDate(new Date(), 21));
   const [summaries, setSummaries] = useState<RestaurantSummary[]>([]);
   const [dailySales, setDailySales] = useState<DailySale[]>([]);
+  const [posSales, setPosSales] = useState<PosSale[]>([]);
   const [pendingRequests, setPendingRequests] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savingSales, setSavingSales] = useState(false);
@@ -81,6 +104,42 @@ export function DashboardPage() {
 
       const activeRestaurants = restaurantRows.filter(r => r.active);
       setRestaurants(activeRestaurants);
+
+      const { data: manualSalesRows, error: manualSalesError } = await supabase
+        .from("sales_daily")
+        .select("id,restaurant_id,sales_date,net_sales,gross_sales,notes")
+        .gte("sales_date", period.start)
+        .lte("sales_date", period.end)
+        .order("sales_date", { ascending: true });
+      if (manualSalesError && manualSalesError.code !== "42P01") throw manualSalesError;
+      const manualSales = (manualSalesRows || []) as DailySale[];
+      setDailySales(manualSales);
+
+      const { data: posRows, error: posError } = await supabase
+        .from("pos_sales")
+        .select("restaurant_id,business_date,gross_amount,net_amount")
+        .gte("business_date", period.start)
+        .lte("business_date", period.end)
+        .order("business_date", { ascending: true });
+      if (posError && posError.code !== "42P01") throw posError;
+      const loadedPosSales = (posRows || []) as PosSale[];
+      setPosSales(loadedPosSales);
+
+      const posByRestaurant = new Map<string, { gross: number; net: number }>();
+      for (const row of loadedPosSales) {
+        const current = posByRestaurant.get(row.restaurant_id) || { gross: 0, net: 0 };
+        current.gross += Number(row.gross_amount || 0);
+        current.net += Number(row.net_amount || 0);
+        posByRestaurant.set(row.restaurant_id, current);
+      }
+
+      const manualByRestaurant = new Map<string, { gross: number; net: number }>();
+      for (const row of manualSales) {
+        const current = manualByRestaurant.get(row.restaurant_id) || { gross: 0, net: 0 };
+        current.gross += Number(row.gross_sales || 0);
+        current.net += Number(row.net_sales || 0);
+        manualByRestaurant.set(row.restaurant_id, current);
+      }
 
       const summaryRows: RestaurantSummary[] = [];
       for (const restaurant of activeRestaurants) {
@@ -130,47 +189,36 @@ export function DashboardPage() {
           ).gross_pay;
         }
 
-        let sales = 0;
-        if (supabase) {
-          const { data, error: salesError } = await supabase
-            .from("sales_daily")
-            .select("gross_sales")
-            .eq("restaurant_id", restaurant.id)
-            .gte("sales_date", period.start)
-            .lte("sales_date", period.end);
-          if (salesError && salesError.code !== "42P01") throw salesError;
-          sales = (data || []).reduce((sum: number, row: any) => sum + Number(row.gross_sales || 0), 0);
-        }
+        const posTotals = posByRestaurant.get(restaurant.id);
+        const manualTotals = manualByRestaurant.get(restaurant.id);
+        const usePos = Boolean(posTotals && (posTotals.gross > 0 || posTotals.net > 0));
+        const grossSales = usePos ? Number(posTotals?.gross || 0) : Number(manualTotals?.gross || 0);
+        const netSales = usePos ? Number(posTotals?.net || 0) : Number(manualTotals?.net || 0);
+        const salesSource: RestaurantSummary["salesSource"] = usePos
+          ? "POS"
+          : (manualTotals && (manualTotals.gross > 0 || manualTotals.net > 0) ? "Manual" : "No sales");
 
         summaryRows.push({
           restaurant,
           employees: assignedEmployees.length,
           workedHours,
           laborCost,
-          sales,
-          productivity: workedHours > 0 ? sales / workedHours : 0,
-          laborPercent: sales > 0 ? (laborCost / sales) * 100 : 0,
+          grossSales,
+          netSales,
+          productivity: workedHours > 0 ? grossSales / workedHours : 0,
+          laborPercent: grossSales > 0 ? (laborCost / grossSales) * 100 : 0,
+          laborPerHour: workedHours > 0 ? laborCost / workedHours : 0,
+          salesSource,
         });
       }
 
       setSummaries(summaryRows);
 
-      if (supabase) {
-        const { data: requestRows, error: requestsError } = await supabase
-          .from("employee_requests")
-          .select("id", { count: "exact" })
-          .eq("status", "pending");
-        if (!requestsError) setPendingRequests(requestRows?.length || 0);
-
-        const { data: salesRows, error: salesRowsError } = await supabase
-          .from("sales_daily")
-          .select("id,restaurant_id,sales_date,net_sales,gross_sales,notes")
-          .gte("sales_date", period.start)
-          .lte("sales_date", period.end)
-          .order("sales_date", { ascending: true });
-        if (salesRowsError && salesRowsError.code !== "42P01") throw salesRowsError;
-        setDailySales((salesRows || []) as DailySale[]);
-      }
+      const { data: requestRows, error: requestsError } = await supabase
+        .from("employee_requests")
+        .select("id")
+        .eq("status", "pending");
+      if (!requestsError) setPendingRequests(requestRows?.length || 0);
     } catch (e: any) {
       setError(errorText(e));
     } finally {
@@ -179,7 +227,7 @@ export function DashboardPage() {
   }
 
   async function saveSale() {
-    if (!supabase || selectedRestaurant === "all" || !salesDate) return;
+    if (selectedRestaurant === "all" || !salesDate) return;
     const value = Number(salesValue.replace(",", "."));
     if (!Number.isFinite(value) || value < 0) {
       setError("Enter a valid sales amount.");
@@ -223,30 +271,66 @@ export function DashboardPage() {
         acc.employees += row.employees;
         acc.workedHours += row.workedHours;
         acc.laborCost += row.laborCost;
-        acc.sales += row.sales;
+        acc.grossSales += row.grossSales;
+        acc.netSales += row.netSales;
         return acc;
       },
-      { employees: 0, workedHours: 0, laborCost: 0, sales: 0 }
+      { employees: 0, workedHours: 0, laborCost: 0, grossSales: 0, netSales: 0 }
     );
     return {
       ...data,
-      productivity: data.workedHours > 0 ? data.sales / data.workedHours : 0,
-      laborPercent: data.sales > 0 ? (data.laborCost / data.sales) * 100 : 0,
+      productivity: data.workedHours > 0 ? data.grossSales / data.workedHours : 0,
+      laborPercent: data.grossSales > 0 ? (data.laborCost / data.grossSales) * 100 : 0,
+      laborPerHour: data.workedHours > 0 ? data.laborCost / data.workedHours : 0,
     };
   }, [visibleSummaries]);
 
-  const trend = useMemo(() => {
-    const ids = new Set(visibleSummaries.map(s => s.restaurant.id));
-    const grouped = new Map<string, number>();
+  const effectiveDailySales = useMemo<EffectiveDailySale[]>(() => {
+    const visibleIds = new Set(visibleSummaries.map(s => s.restaurant.id));
+    const posDaily = new Map<string, EffectiveDailySale>();
+
+    for (const row of posSales) {
+      if (!visibleIds.has(row.restaurant_id)) continue;
+      const key = posKey(row.restaurant_id, row.business_date);
+      const current = posDaily.get(key) || {
+        restaurant_id: row.restaurant_id,
+        sales_date: row.business_date,
+        gross_sales: 0,
+        net_sales: 0,
+        source: "POS" as const,
+      };
+      current.gross_sales += Number(row.gross_amount || 0);
+      current.net_sales += Number(row.net_amount || 0);
+      posDaily.set(key, current);
+    }
+
+    const out = new Map(posDaily);
     for (const row of dailySales) {
-      if (!ids.has(row.restaurant_id)) continue;
-      grouped.set(row.sales_date, (grouped.get(row.sales_date) || 0) + Number(row.gross_sales || 0));
+      if (!visibleIds.has(row.restaurant_id)) continue;
+      const key = posKey(row.restaurant_id, row.sales_date);
+      if (posDaily.has(key)) continue;
+      out.set(key, {
+        restaurant_id: row.restaurant_id,
+        sales_date: row.sales_date,
+        gross_sales: Number(row.gross_sales || 0),
+        net_sales: Number(row.net_sales || 0),
+        source: "Manual",
+      });
+    }
+
+    return [...out.values()].sort((a, b) => a.sales_date.localeCompare(b.sales_date));
+  }, [dailySales, posSales, visibleSummaries]);
+
+  const trend = useMemo(() => {
+    const grouped = new Map<string, number>();
+    for (const row of effectiveDailySales) {
+      grouped.set(row.sales_date, (grouped.get(row.sales_date) || 0) + row.gross_sales);
     }
     return [...grouped.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-14)
       .map(([date, sales]) => ({ date, sales }));
-  }, [dailySales, visibleSummaries]);
+  }, [effectiveDailySales]);
 
   const maxTrend = Math.max(1, ...trend.map(d => d.sales));
 
@@ -255,7 +339,7 @@ export function DashboardPage() {
       <div className="dashboard-pro-header">
         <div>
           <h2>{t.welcome}, {profile?.full_name || profile?.email}</h2>
-          <p>Dashboard PRO · labor cost, hours, sales and productivity.</p>
+          <p>Dashboard Financial · sales, payroll cost and productivity by restaurant.</p>
         </div>
         <div className="dashboard-pro-controls">
           <label>
@@ -275,6 +359,7 @@ export function DashboardPage() {
           </label>
           <button className="secondary" onClick={() => setPeriod(movePayrollPeriod(period, -1, 21))}>←</button>
           <button className="secondary" onClick={() => setPeriod(movePayrollPeriod(period, 1, 21))}>→</button>
+          <button className="secondary" onClick={() => window.print()}>Print / PDF</button>
         </div>
       </div>
 
@@ -284,12 +369,14 @@ export function DashboardPage() {
 
       {error && <div className="alert">{error}</div>}
 
-      <div className="dashboard-kpis">
-        <div className="dashboard-kpi"><span>Sales</span><strong>{eur.format(totals.sales)}</strong></div>
+      <div className="dashboard-kpis dashboard-kpis-financial">
+        <div className="dashboard-kpi"><span>Gross sales</span><strong>{eur.format(totals.grossSales)}</strong></div>
+        <div className="dashboard-kpi"><span>Net sales</span><strong>{eur.format(totals.netSales)}</strong></div>
         <div className="dashboard-kpi"><span>Labor cost</span><strong>{eur.format(totals.laborCost)}</strong></div>
         <div className="dashboard-kpi"><span>Labor %</span><strong>{num.format(totals.laborPercent)} %</strong></div>
         <div className="dashboard-kpi"><span>Worked hours</span><strong>{num.format(totals.workedHours)} h</strong></div>
         <div className="dashboard-kpi"><span>Sales / hour</span><strong>{eur.format(totals.productivity)}</strong></div>
+        <div className="dashboard-kpi"><span>Labor / hour</span><strong>{eur.format(totals.laborPerHour)}</strong></div>
         <div className="dashboard-kpi"><span>Employees</span><strong>{totals.employees}</strong></div>
         <div className="dashboard-kpi"><span>Pending requests</span><strong>{pendingRequests}</strong></div>
       </div>
@@ -302,20 +389,23 @@ export function DashboardPage() {
             <div className="dashboard-section-heading">
               <div>
                 <h3>Restaurant performance</h3>
-                <p>Payroll cost compared with sales for the selected period.</p>
+                <p>Gross/net sales compared with calculated payroll cost for the selected 21→20 period.</p>
               </div>
             </div>
             <div className="table-wrap">
-              <table className="dashboard-table">
+              <table className="dashboard-table dashboard-financial-table">
                 <thead>
                   <tr>
                     <th>Restaurant</th>
                     <th>Employees</th>
                     <th>Worked h</th>
-                    <th>Sales</th>
+                    <th>Gross sales</th>
+                    <th>Net sales</th>
                     <th>Labor cost</th>
                     <th>Labor %</th>
                     <th>Sales / h</th>
+                    <th>Labor / h</th>
+                    <th>Sales source</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -324,10 +414,13 @@ export function DashboardPage() {
                       <td><strong>{row.restaurant.name}</strong></td>
                       <td>{row.employees}</td>
                       <td>{num.format(row.workedHours)}</td>
-                      <td>{eur.format(row.sales)}</td>
+                      <td>{eur.format(row.grossSales)}</td>
+                      <td>{eur.format(row.netSales)}</td>
                       <td>{eur.format(row.laborCost)}</td>
                       <td>{num.format(row.laborPercent)} %</td>
                       <td>{eur.format(row.productivity)}</td>
+                      <td>{eur.format(row.laborPerHour)}</td>
+                      <td><span className={`dashboard-source dashboard-source-${row.salesSource.toLowerCase().replace(" ", "-")}`}>{row.salesSource}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -340,11 +433,11 @@ export function DashboardPage() {
               <div className="dashboard-section-heading">
                 <div>
                   <h3>Sales trend</h3>
-                  <p>Last 14 entered sales days in this payroll period.</p>
+                  <p>Last 14 sales days. POS data is used automatically when it exists; manual sales fill missing days.</p>
                 </div>
               </div>
               {trend.length === 0 ? (
-                <p className="dashboard-empty">No sales entered yet.</p>
+                <p className="dashboard-empty">No sales entered or imported yet.</p>
               ) : (
                 <div className="dashboard-bars">
                   {trend.map(item => (
@@ -364,7 +457,7 @@ export function DashboardPage() {
               <div className="dashboard-section-heading">
                 <div>
                   <h3>Daily sales</h3>
-                  <p>Enter sales to calculate productivity and labor percentage.</p>
+                  <p>Manual fallback. If POS sales exist for the same restaurant/day, POS is used in the dashboard.</p>
                 </div>
               </div>
 
@@ -399,14 +492,13 @@ export function DashboardPage() {
               )}
 
               <div className="dashboard-sales-list">
-                {dailySales
-                  .filter(s => selectedRestaurant === "all" || s.restaurant_id === selectedRestaurant)
+                {effectiveDailySales
                   .slice(-8)
                   .reverse()
                   .map(s => (
                     <div key={`${s.restaurant_id}-${s.sales_date}`}>
-                      <span>{s.sales_date}</span>
-                      <strong>{eur.format(Number(s.gross_sales || 0))}</strong>
+                      <span>{s.sales_date} · {s.source}</span>
+                      <strong>{eur.format(s.gross_sales)}</strong>
                     </div>
                   ))}
               </div>
