@@ -36,6 +36,33 @@ function hoursLabel(value: number) {
   return value ? value.toFixed(2).replace(/\.00$/, "") : "";
 }
 
+type RotaQaIssue = {
+  employeeId: string;
+  date: string;
+  slot?: number;
+  kind: "incomplete" | "zero_length" | "overlap" | "coded_time";
+};
+
+function minutesOf(value: string) {
+  const [hour, minute] = value.slice(0, 5).split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function timedInterval(shift: ShiftDraft): [number, number] | null {
+  if (!shift.start_time || !shift.end_time || shift.start_time === shift.end_time) return null;
+  const start = minutesOf(shift.start_time);
+  let end = minutesOf(shift.end_time);
+  if (end < start) end += 24 * 60;
+  return [start, end];
+}
+
+function intervalsOverlap(a: [number, number], b: [number, number]) {
+  // Compare the same-day interval and a shifted copy so overnight shifts are covered.
+  return a[0] < b[1] && b[0] < a[1]
+    || a[0] < b[1] + 1440 && b[0] + 1440 < a[1]
+    || a[0] + 1440 < b[1] && b[0] < a[1] + 1440;
+}
+
 export function RotaPage() {
   const { profile, language, t } = useApp();
   const canEdit = Boolean(profile && ["super_admin", "admin", "manager"].includes(profile.role));
@@ -65,6 +92,16 @@ export function RotaPage() {
     const timer = window.setTimeout(() => setMessage(""), 2500);
     return () => window.clearTimeout(timer);
   }, [message]);
+
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!dirty.size) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
 
   useEffect(() => {
     (async () => {
@@ -186,8 +223,69 @@ export function RotaPage() {
     setMessage("");
   }
 
+  const qaIssues = useMemo<RotaQaIssue[]>(() => {
+    const issues: RotaQaIssue[] = [];
+    for (const employee of restaurantEmployees) {
+      for (const date of dates) {
+        const timed: Array<{ slot: number; interval: [number, number] }> = [];
+        for (let slot = 1; slot <= MAX_SHIFTS_PER_DAY; slot += 1) {
+          const shift = shifts[shiftKey(employee.id, date, slot)];
+          if (!shift) continue;
+          const code = (shift.code || "").trim().toLowerCase();
+          const hasStart = Boolean(shift.start_time);
+          const hasEnd = Boolean(shift.end_time);
+          const hasAny = hasStart || hasEnd || Boolean(code) || Boolean(shift.note?.trim());
+          if (!hasAny) continue;
+
+          if (hasStart !== hasEnd) {
+            issues.push({ employeeId: employee.id, date, slot, kind: "incomplete" });
+            continue;
+          }
+          if (hasStart && hasEnd && shift.start_time === shift.end_time) {
+            issues.push({ employeeId: employee.id, date, slot, kind: "zero_length" });
+            continue;
+          }
+          if (["s", "vl", "vv", "v", "vp"].includes(code) && (hasStart || hasEnd)) {
+            issues.push({ employeeId: employee.id, date, slot, kind: "coded_time" });
+          }
+          const interval = timedInterval(shift);
+          if (interval && !code) timed.push({ slot, interval });
+        }
+        for (let i = 0; i < timed.length; i += 1) {
+          for (let j = i + 1; j < timed.length; j += 1) {
+            if (intervalsOverlap(timed[i].interval, timed[j].interval)) {
+              issues.push({ employeeId: employee.id, date, slot: timed[j].slot, kind: "overlap" });
+            }
+          }
+        }
+      }
+    }
+    return issues;
+  }, [dates, restaurantEmployees, shifts]);
+
+  function cellHasQaIssue(employeeId: string, date: string) {
+    return qaIssues.some((issue) => issue.employeeId === employeeId && issue.date === date);
+  }
+
+  function confirmDiscardChanges() {
+    if (!dirty.size) return true;
+    return window.confirm(language === "fi"
+      ? "Tallentamattomia muutoksia on. Hylätäänkö ne?"
+      : language === "es"
+        ? "Hay cambios sin guardar. ¿Quieres descartarlos?"
+        : "There are unsaved changes. Discard them?");
+  }
+
   async function saveAll() {
     if (!canEdit || !restaurantId || !dirty.size) return;
+    if (qaIssues.length) {
+      setError(language === "fi"
+        ? `Korjaa rota ennen tallennusta (${qaIssues.length} ongelmaa).`
+        : language === "es"
+          ? `Corrige el rota antes de guardar (${qaIssues.length} problema${qaIssues.length === 1 ? "" : "s"}).`
+          : `Fix the rota before saving (${qaIssues.length} issue${qaIssues.length === 1 ? "" : "s"}).`);
+      return;
+    }
     try {
       setSaving(true);
       setError("");
@@ -208,11 +306,17 @@ export function RotaPage() {
   }
 
   function changeStart(value: string) {
-    if (!value) return;
+    if (!value || !confirmDiscardChanges()) return;
     setStartDate(isoDate(mondayOf(parseIsoDate(value))));
   }
 
+  function changeRestaurant(value: string) {
+    if (!confirmDiscardChanges()) return;
+    setRestaurantId(value);
+  }
+
   function moveWeeks(days: number) {
+    if (!confirmDiscardChanges()) return;
     setStartDate(isoDate(addDays(parseIsoDate(startDate), days)));
   }
 
@@ -280,7 +384,7 @@ export function RotaPage() {
         <div className="rota-toolbar-controls">
           <label>
             <span>{t.restaurant || t.restaurants}</span>
-            <select value={restaurantId} onChange={(e) => setRestaurantId(e.target.value)}>
+            <select value={restaurantId} onChange={(e) => changeRestaurant(e.target.value)}>
               {restaurants.map((restaurant) => (
                 <option key={restaurant.id} value={restaurant.id}>{restaurant.name}</option>
               ))}
@@ -292,7 +396,7 @@ export function RotaPage() {
           </label>
           <button className="secondary" onClick={() => moveWeeks(-21)}>← {t.previous || "Previous"}</button>
           <button className="secondary" onClick={() => moveWeeks(21)}>{t.next || "Next"} →</button>
-          {canEdit && <button disabled={saving || !dirty.size} onClick={saveAll}>{saving ? (t.saving || "Saving…") : `${t.save || "Save"}${dirty.size ? ` (${dirty.size})` : ""}`}</button>}
+          {canEdit && <button disabled={saving || !dirty.size || qaIssues.length > 0} title={qaIssues.length ? (language === "es" ? "Corrige los errores de Rota QA antes de guardar" : language === "fi" ? "Korjaa Rota QA -virheet ennen tallennusta" : "Fix Rota QA issues before saving") : ""} onClick={saveAll}>{saving ? (t.saving || "Saving…") : `${t.save || "Save"}${dirty.size ? ` (${dirty.size})` : ""}`}</button>}
           <button onClick={() => window.print()}>{t.print || "Print"}</button>
         </div>
       </div>
@@ -301,7 +405,17 @@ export function RotaPage() {
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
       <div className="phase-card rota-tip no-print">
-        <strong>Phase 4.7:</strong> {language === "fi" ? "Samalle työntekijälle voi lisätä useita vuoroja samalle päivälle + Vuoro -painikkeella." : language === "es" ? "Puedes agregar varios turnos a la misma persona en el mismo día con + Turno." : "Add multiple shifts for the same employee on the same day with + Shift."}
+        <strong>Phase 5.3:</strong> {language === "fi" ? "Rota QA tarkistaa puuttuvat ajat, päällekkäiset vuorot ja tallentamattomat muutokset." : language === "es" ? "Rota QA comprueba horas incompletas, turnos superpuestos y cambios sin guardar." : "Rota QA checks incomplete times, overlapping shifts and unsaved changes."}
+      </div>
+
+      <div className={`rota-qa-card no-print ${qaIssues.length ? "has-errors" : "is-ready"}`}>
+        <div>
+          <strong>Rota QA: {qaIssues.length ? (language === "fi" ? "KORJATTAVA" : language === "es" ? "REVISAR" : "CHECK") : "✓ READY"}</strong>
+          <span>{qaIssues.length
+            ? (language === "fi" ? `${qaIssues.length} ongelmaa estää tallennuksen.` : language === "es" ? `${qaIssues.length} problema${qaIssues.length === 1 ? "" : "s"} impide${qaIssues.length === 1 ? "" : "n"} guardar.` : `${qaIssues.length} issue${qaIssues.length === 1 ? "" : "s"} block saving.`)
+            : (language === "fi" ? "Vuorot läpäisevät perustarkistukset." : language === "es" ? "Los turnos pasan las comprobaciones básicas." : "Shifts pass the basic checks.")}
+        </div>
+        {dirty.size > 0 && <span className="rota-unsaved">{language === "fi" ? `${dirty.size} tallentamatta` : language === "es" ? `${dirty.size} sin guardar` : `${dirty.size} unsaved`}</span>}
       </div>
 
       <div className="print-rota-title">
@@ -369,7 +483,7 @@ export function RotaPage() {
                               const dayTotal = slots.reduce((sum, slot) => sum + shiftHours(shifts[shiftKey(employee.id, date, slot)]), 0);
                               const cellDirty = slots.some((slot) => dirty.has(shiftKey(employee.id, date, slot)));
                               return (
-                                <td key={date} className={cellDirty ? "dirty" : ""}>
+                                <td key={date} className={`${cellDirty ? "dirty " : ""}${cellHasQaIssue(employee.id, date) ? "qa-error" : ""}`.trim()}>
                                   <div className="multi-shift-editor no-print">
                                     {slots.map((slot) => {
                                       const key = shiftKey(employee.id, date, slot);
