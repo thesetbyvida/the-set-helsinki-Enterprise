@@ -1,12 +1,14 @@
 {
   "name": "the-set-helsinki-enterprise",
   "private": true,
-  "version": "4.9.0",
+  "version": "5.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "tsc -b",
+    "verify": "npm run check && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

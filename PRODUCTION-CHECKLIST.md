@@ -1,0 +1,24 @@
+# Production checklist — The Set Helsinki Enterprise 5.0
+
+- [ ] Vercel build is Ready and shows package version 5.0.0.
+- [ ] `VITE_SUPABASE_URL` is configured in Vercel.
+- [ ] `VITE_SUPABASE_ANON_KEY` or `VITE_SUPABASE_PUBLISHABLE_KEY` is configured in Vercel.
+- [ ] Supabase migrations 001–023 required by the project have been applied.
+- [ ] Admin login works.
+- [ ] Employee login works.
+- [ ] Restaurant selector returns the expected restaurants.
+- [ ] Employee order persists after refresh.
+- [ ] Rota allows more than one shift for one employee on the same date.
+- [ ] 3-week rota totals are correct.
+- [ ] Cross-midnight shifts split correctly.
+- [ ] Evening, night, Sunday, holiday and aatto hours are correct.
+- [ ] Monthly-salary employees show monthly base salary in Payroll.
+- [ ] Hourly employees calculate base salary from payable hours and hourly rate.
+- [ ] Payroll period 21→20 can be selected historically.
+- [ ] Closed payroll periods remain frozen until reopened.
+- [ ] CSV/Excel/Print exports work.
+- [ ] POS sales appear in Dashboard.
+- [ ] Labor cost % and sales/hour show expected values.
+- [ ] Vacation/VV/shift-change requests can be submitted and reviewed.
+- [ ] Audit page records protected changes.
+- [ ] Employee users cannot access restricted payroll/financial administration.
