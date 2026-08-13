@@ -15,6 +15,7 @@ import EmployeePortalPage from "./pages/EmployeePortalPage";
 import VacationsPage from "./pages/VacationsPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { ProductionPage } from "./pages/ProductionPage";
+import { PosPage } from "./pages/PosPage";
 
 export default function App() {
   const {
@@ -90,6 +91,7 @@ export default function App() {
         if (page === "payroll") return <PayrollPage />;
         if (page === "vv") return <VvPage />;
         if (page === "reports") return <ReportsPage />;
+        if (page === "pos") return <PosPage />;
         if (page === "production") return <ProductionPage />;
 
         const descriptions: Record<string, string> = {

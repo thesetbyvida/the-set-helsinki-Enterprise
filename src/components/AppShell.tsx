@@ -12,6 +12,8 @@ type PageId =
   | "payroll"
   | "vv"
   | "reports"
+  | "pos"
+  | "production"
   | "settings";
 
 interface AppShellProps {
@@ -32,12 +34,14 @@ export function AppShell({ children }: AppShellProps) {
     ["payroll", t.payroll],
     ["vv", t.vv],
     ["reports", t.reports],
+    ["pos", t.pos || "POS / Sales"],
+    ["production", t.production || "Production"],
     ["settings", t.settings],
   ];
 
   const visiblePages = allPages.filter(([id]) => {
     if (profile?.role === "employee") return ["dashboard", "rota", "vv"].includes(id);
-    if (profile?.role === "manager") return !["users", "settings"].includes(id);
+    if (profile?.role === "manager") return !["users", "production", "settings"].includes(id);
     return true;
   });
 
