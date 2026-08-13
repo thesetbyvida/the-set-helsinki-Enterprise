@@ -340,3 +340,7 @@ button.small{padding:6px 9px;font-size:12px}
 .employee-mini-list>div:last-child{border-bottom:0}
 .employee-mini-list span{color:#64748b}
 @media(max-width:900px){.request-kpis{grid-template-columns:repeat(2,minmax(120px,1fr))}.employee-mini-list>div{grid-template-columns:1fr}.employee-mini-list span{font-size:13px}}
+
+
+/* Enterprise 4.9 — Security & Audit */
+.audit-filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.audit-filters label{display:grid;gap:5px;min-width:180px}.audit-filters label span{font-size:11px;color:#64748b}.audit-summary{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px}.audit-summary>div{display:grid;gap:5px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc}.audit-summary span{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em}.audit-summary strong{font-size:16px}.audit-table-wrap{padding:0;overflow:auto}.audit-table{min-width:980px}.audit-action{display:inline-flex;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.04em}.audit-insert{background:#dcfce7;color:#166534}.audit-update{background:#dbeafe;color:#1d4ed8}.audit-delete{background:#fee2e2;color:#b91c1c}.audit-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:11px}@media(max-width:800px){.audit-summary{grid-template-columns:1fr}.audit-filters{display:grid}.audit-filters label{min-width:0}}

@@ -16,6 +16,7 @@ import VacationsPage from "./pages/VacationsPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { ProductionPage } from "./pages/ProductionPage";
 import { PosPage } from "./pages/PosPage";
+import { AuditPage } from "./pages/AuditPage";
 
 export default function App() {
   const {
@@ -93,6 +94,7 @@ export default function App() {
         if (page === "reports") return <ReportsPage />;
         if (page === "pos") return <PosPage />;
         if (page === "production") return <ProductionPage />;
+        if (page === "audit") return <AuditPage />;
         if (page === "mywork") return <EmployeePortalPage />;
         if (page === "requests") return <VacationsPage />;
 

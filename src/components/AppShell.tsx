@@ -14,6 +14,7 @@ type PageId =
   | "reports"
   | "pos"
   | "production"
+  | "audit"
   | "mywork"
   | "requests"
   | "settings";
@@ -38,6 +39,7 @@ export function AppShell({ children }: AppShellProps) {
     ["reports", t.reports],
     ["pos", t.pos || "POS / Sales"],
     ["production", t.production || "Production"],
+    ["audit", "Security / Audit"],
     ["mywork", t.myWork || "My work"],
     ["requests", t.requests || "Requests"],
     ["settings", t.settings],
@@ -45,7 +47,8 @@ export function AppShell({ children }: AppShellProps) {
 
   const visiblePages = allPages.filter(([id]) => {
     if (profile?.role === "employee") return ["dashboard", "rota", "vv", "mywork", "requests"].includes(id);
-    if (profile?.role === "manager") return !["users", "production", "settings"].includes(id);
+    if (profile?.role === "manager") return !["users", "payroll", "reports", "production", "audit", "settings"].includes(id);
+    if (id === "audit") return profile?.role === "super_admin" || profile?.role === "admin";
     return true;
   });
 
