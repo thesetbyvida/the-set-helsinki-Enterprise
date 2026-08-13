@@ -20,6 +20,8 @@ export interface PosSaleDraft {
   source?: string;
 }
 
+export interface PosImportResult { imported: number; skipped: number; failed: number; }
+
 function client() {
   if (!supabase) throw new Error("Supabase is not configured.");
   return supabase;
@@ -48,6 +50,48 @@ export async function addPosSale(draft: PosSaleDraft) {
     source: draft.source?.trim() || "manual",
   });
   if (error) throw error;
+}
+
+export async function importPosSales(restaurantId: string, rows: PosSaleDraft[], source: string, fileName: string): Promise<PosImportResult> {
+  const c = client();
+  const { data: job, error: jobError } = await c.from('pos_import_jobs').insert({
+    restaurant_id: restaurantId,
+    source,
+    status: 'running',
+    file_name: fileName,
+  }).select('id').single();
+  if (jobError) throw jobError;
+
+  try {
+    const payload = rows.map(r => ({
+      business_date: r.business_date,
+      receipt_no: r.receipt_no?.trim() || null,
+      gross_amount: Number(r.gross_amount || 0),
+      net_amount: Number(r.net_amount || 0),
+      source: r.source?.trim() || source,
+    }));
+    const { data, error } = await c.rpc('import_pos_sales_batch', {
+      p_restaurant_id: restaurantId,
+      p_source: source,
+      p_rows: payload,
+    });
+    if (error) throw error;
+    const result = (data || {}) as Partial<PosImportResult>;
+    const finalResult: PosImportResult = {
+      imported: Number(result.imported || 0),
+      skipped: Number(result.skipped || 0),
+      failed: Number(result.failed || 0),
+    };
+    await c.from('pos_import_jobs').update({
+      status: 'completed', imported_rows: finalResult.imported,
+      skipped_rows: finalResult.skipped, failed_rows: finalResult.failed,
+      completed_at: new Date().toISOString(),
+    }).eq('id', job.id);
+    return finalResult;
+  } catch (e) {
+    await c.from('pos_import_jobs').update({ status: 'failed', failed_rows: rows.length, completed_at: new Date().toISOString() }).eq('id', job.id);
+    throw e;
+  }
 }
 
 export async function deletePosSale(id: string) {

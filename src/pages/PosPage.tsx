@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { formatError } from "../lib/errors";
-import { addPosSale, deletePosSale, listPosSales, type PosSale } from "../lib/pos";
+import { addPosSale, deletePosSale, importPosSales, listPosSales, type PosSale } from "../lib/pos";
+import { parsePosCsv, validCsvRows, type CsvPreviewRow } from "../lib/posCsv";
 import { listRestaurants } from "../lib/restaurants";
 import type { Restaurant } from "../types/app";
 
@@ -26,13 +27,21 @@ export function PosPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [csvRows, setCsvRows] = useState<CsvPreviewRow[]>([]);
+  const [csvFileName, setCsvFileName] = useState("");
+  const [csvSource, setCsvSource] = useState("csv");
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const labels = language === "fi" ? {
-    title: "POS / Myynti", desc: "Päivittäisen myynnin tuonti ja tarkistus ravintoloittain.", from: "Alkaen", to: "Päättyen", date: "Päivä", receipt: "Kuitti", gross: "Brutto €", net: "Netto €", source: "Lähde", add: "Lisää myynti", empty: "Ei myyntitietoja valitulla jaksolla.", saved: "Myynti tallennettu.", total: "Yhteensä", delete: "Poista"
+    title: "POS / Myynti", desc: "Päivittäisen myynnin tuonti ja tarkistus ravintoloittain.", from: "Alkaen", to: "Päättyen", date: "Päivä", receipt: "Kuitti", gross: "Brutto €", net: "Netto €", source: "Lähde", add: "Lisää myynti", empty: "Ei myyntitietoja valitulla jaksolla.", saved: "Myynti tallennettu.", total: "Yhteensä", delete: "Poista",
+    csv: "CSV-tuonti", choose: "Valitse CSV", import: "Tuo kelvolliset rivit", clear: "Tyhjennä", preview: "Esikatselu", line: "Rivi", status: "Tila", ready: "Valmis", invalid: "Virhe", validRows: "kelvollista", invalidRows: "virheellistä", csvHelp: "Sarakkeet: Date/Business Date, Receipt, Gross, Net, Source. Tukee pilkkua tai puolipistettä ja päivämääriä YYYY-MM-DD tai DD.MM.YYYY.", imported: "Tuonti valmis", duplicate: "ohitettu / kaksoiskappale", failed: "epäonnistui"
   } : language === "es" ? {
-    title: "POS / Ventas", desc: "Importación y revisión de ventas diarias por restaurante.", from: "Desde", to: "Hasta", date: "Fecha", receipt: "Recibo", gross: "Bruto €", net: "Neto €", source: "Fuente", add: "Agregar venta", empty: "No hay ventas en el periodo seleccionado.", saved: "Venta guardada.", total: "Total", delete: "Eliminar"
+    title: "POS / Ventas", desc: "Importación y revisión de ventas diarias por restaurante.", from: "Desde", to: "Hasta", date: "Fecha", receipt: "Recibo", gross: "Bruto €", net: "Neto €", source: "Fuente", add: "Agregar venta", empty: "No hay ventas en el periodo seleccionado.", saved: "Venta guardada.", total: "Total", delete: "Eliminar",
+    csv: "Importar CSV", choose: "Seleccionar CSV", import: "Importar filas válidas", clear: "Limpiar", preview: "Vista previa", line: "Línea", status: "Estado", ready: "Lista", invalid: "Error", validRows: "válidas", invalidRows: "con error", csvHelp: "Columnas: Date/Business Date, Receipt, Gross, Net, Source. Admite coma o punto y coma y fechas YYYY-MM-DD o DD.MM.YYYY.", imported: "Importación terminada", duplicate: "omitidas / duplicadas", failed: "fallidas"
   } : {
-    title: "POS / Sales", desc: "Daily sales import and review by restaurant.", from: "From", to: "To", date: "Date", receipt: "Receipt", gross: "Gross €", net: "Net €", source: "Source", add: "Add sale", empty: "No sales for the selected period.", saved: "Sale saved.", total: "Total", delete: "Delete"
+    title: "POS / Sales", desc: "Daily sales import and review by restaurant.", from: "From", to: "To", date: "Date", receipt: "Receipt", gross: "Gross €", net: "Net €", source: "Source", add: "Add sale", empty: "No sales for the selected period.", saved: "Sale saved.", total: "Total", delete: "Delete",
+    csv: "CSV import", choose: "Choose CSV", import: "Import valid rows", clear: "Clear", preview: "Preview", line: "Line", status: "Status", ready: "Ready", invalid: "Error", validRows: "valid", invalidRows: "invalid", csvHelp: "Columns: Date/Business Date, Receipt, Gross, Net, Source. Supports comma or semicolon CSV and YYYY-MM-DD or DD.MM.YYYY dates.", imported: "Import completed", duplicate: "skipped / duplicate", failed: "failed"
   };
 
   async function loadSales(targetRestaurantId = restaurantId) {
@@ -54,6 +63,8 @@ export function PosPage() {
   useEffect(() => { if (restaurantId) void loadSales(restaurantId); }, [restaurantId, from, to]);
 
   const totals = useMemo(() => sales.reduce((a, s) => ({ gross: a.gross + Number(s.gross_amount || 0), net: a.net + Number(s.net_amount || 0) }), { gross: 0, net: 0 }), [sales]);
+  const validCount = csvRows.filter(r => r.valid).length;
+  const invalidCount = csvRows.length - validCount;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +82,35 @@ export function PosPage() {
     try { await deletePosSale(id); await loadSales(); } catch (e) { setError(formatError(e)); }
   }
 
+  async function chooseCsv(file?: File) {
+    if (!file) return;
+    setError(""); setMessage("");
+    try {
+      const text = await file.text();
+      setCsvRows(parsePosCsv(text, csvSource));
+      setCsvFileName(file.name);
+    } catch (e) {
+      setCsvRows([]); setCsvFileName(""); setError(formatError(e));
+    }
+  }
+
+  async function runImport() {
+    if (!canEdit || !restaurantId || !validCount) return;
+    try {
+      setImporting(true); setError(""); setMessage("");
+      const rows = validCsvRows(csvRows, restaurantId).map(r => ({ ...r, source: r.source || csvSource }));
+      const result = await importPosSales(restaurantId, rows, csvSource, csvFileName || "import.csv");
+      setMessage(`${labels.imported}: ${result.imported} ${labels.validRows}, ${result.skipped} ${labels.duplicate}, ${result.failed} ${labels.failed}.`);
+      setCsvRows([]); setCsvFileName(""); if (fileRef.current) fileRef.current.value = "";
+      await loadSales();
+    } catch (e) { setError(formatError(e)); }
+    finally { setImporting(false); }
+  }
+
+  function clearCsv() {
+    setCsvRows([]); setCsvFileName(""); if (fileRef.current) fileRef.current.value = "";
+  }
+
   return <div className="pos-page">
     <div className="panel pos-toolbar">
       <div><h2>{labels.title}</h2><p className="muted">{labels.desc}</p></div>
@@ -81,6 +121,28 @@ export function PosPage() {
       </div>
     </div>
     {error && <div className="alert">{error}</div>}{message && <div className="notice">{message}</div>}
+
+    {canEdit && <section className="panel pos-csv no-print">
+      <div className="pos-csv-head">
+        <div><h3>{labels.csv}</h3><p className="muted">{labels.csvHelp}</p></div>
+        <div className="pos-csv-actions">
+          <label className="pos-source"><span>{labels.source}</span><input value={csvSource} onChange={e=>setCsvSource(e.target.value)} /></label>
+          <input ref={fileRef} className="pos-file-input" id="pos-csv-file" type="file" accept=".csv,text/csv" onChange={e=>void chooseCsv(e.target.files?.[0])} />
+          <label className="button secondary" htmlFor="pos-csv-file">{labels.choose}</label>
+          {csvRows.length > 0 && <button className="secondary" type="button" onClick={clearCsv}>{labels.clear}</button>}
+          <button type="button" disabled={!validCount || importing || !restaurantId} onClick={()=>void runImport()}>{importing ? (t.saving || "Saving…") : labels.import}</button>
+        </div>
+      </div>
+      {csvRows.length > 0 && <>
+        <div className="pos-csv-summary"><strong>{csvFileName}</strong><span>{validCount} {labels.validRows}</span><span>{invalidCount} {labels.invalidRows}</span></div>
+        <div className="pos-csv-preview">
+          <table className="pos-table"><thead><tr><th>{labels.line}</th><th>{labels.date}</th><th>{labels.receipt}</th><th>{labels.source}</th><th>{labels.gross}</th><th>{labels.net}</th><th>{labels.status}</th></tr></thead>
+          <tbody>{csvRows.slice(0,100).map(r=><tr key={r.line} className={r.valid ? "" : "pos-invalid-row"}><td>{r.line}</td><td>{r.business_date || "—"}</td><td>{r.receipt_no || "—"}</td><td>{r.source}</td><td>{r.gross_amount.toFixed(2)}</td><td>{r.net_amount.toFixed(2)}</td><td>{r.valid ? `✓ ${labels.ready}` : `⚠ ${r.error || labels.invalid}`}</td></tr>)}</tbody></table>
+          {csvRows.length > 100 && <p className="muted pos-empty">{labels.preview}: 100 / {csvRows.length}</p>}
+        </div>
+      </>}
+    </section>}
+
     {canEdit && <form className="panel pos-entry" onSubmit={submit}>
       <label><span>{labels.date}</span><input type="date" value={businessDate} onChange={e=>setBusinessDate(e.target.value)} required /></label>
       <label><span>{labels.receipt}</span><input value={receiptNo} onChange={e=>setReceiptNo(e.target.value)} /></label>

@@ -22,7 +22,7 @@ export function ProductionPage() {
     });
 
     if (supabase) {
-      const tables = ["profiles","restaurants","employees","employee_restaurants","rota_shifts","employee_requests","sales_daily"];
+      const tables = ["profiles","restaurants","employees","employee_restaurants","rota_shifts","employee_requests","sales_daily","pos_sales","pos_import_jobs"];
       for (const table of tables) {
         const { error } = await supabase.from(table).select("*", { head: true, count: "exact" }).limit(1);
         result.push({
@@ -44,7 +44,7 @@ export function ProductionPage() {
       <div className="page-header">
         <div>
           <h1>Production status</h1>
-          <p className="muted">Final readiness checks for The Set Helsinki Enterprise 4.0.</p>
+          <p className="muted">Final readiness checks for The Set Helsinki Enterprise 4.2.</p>
         </div>
         <button className="secondary" onClick={() => void runChecks()}>Run checks</button>
       </div>
