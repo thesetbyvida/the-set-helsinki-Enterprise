@@ -8,12 +8,14 @@ import {
   calculatePayrollRow,
   getPayrollSettings,
   listPayrollAdjustments,
+  listPayrollPeriodRecords,
   listPayrollShifts,
   listPayrollSpecialDays,
   listRotaPeriodsForRange,
   movePayrollPeriod,
   payrollPeriodForDate,
   type PayrollPeriod,
+  type PayrollPeriodRecord,
   type PayrollRow,
 } from "../lib/payroll";
 import { emptyTes } from "../lib/tes";
@@ -78,6 +80,8 @@ export function ReportsPage() {
   const [period, setPeriod] = useState<PayrollPeriod>(() => payrollPeriodForDate(new Date(), 21));
   const [reportKind, setReportKind] = useState<ReportKind>("payroll");
   const [rows, setRows] = useState<ReportRow[]>([]);
+  const [periodRecords, setPeriodRecords] = useState<PayrollPeriodRecord[]>([]);
+  const [activePeriodRecord, setActivePeriodRecord] = useState<PayrollPeriodRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -117,13 +121,54 @@ export function ReportsPage() {
 
   useEffect(() => {
     if (!restaurantId) return;
+    void (async () => {
+      try {
+        setPeriodRecords(await listPayrollPeriodRecords(restaurantId));
+      } catch (e: any) {
+        setError(errorText(e));
+      }
+    })();
+  }, [restaurantId]);
+
+  useEffect(() => {
+    if (!restaurantId) return;
     void loadReport();
-  }, [restaurantId, period.start, period.end, visibleEmployees]);
+  }, [restaurantId, period.start, period.end, visibleEmployees, periodRecords]);
 
   async function loadReport() {
     setLoading(true);
     setError("");
     try {
+      const periodRecord = periodRecords.find(
+        r => r.period_start === period.start && r.period_end === period.end
+      ) || null;
+      setActivePeriodRecord(periodRecord);
+
+      if (periodRecord?.status === "closed" && Array.isArray(periodRecord.rows_snapshot) && periodRecord.rows_snapshot.length) {
+        const snapshotRows = periodRecord.rows_snapshot.map((payroll: PayrollRow) => ({
+          employee: payroll.employee?.name || "—",
+          payBasis: payroll.pay_basis,
+          basePay: Number(payroll.base_pay || 0),
+          baseHours: Number(payroll.hours?.base_hours || 0),
+          workedHours: Number(payroll.hours?.worked_hours || 0),
+          evening: Number(payroll.hours?.evening_hours || 0),
+          night: Number(payroll.hours?.night_hours || 0),
+          sunday: Number(payroll.hours?.sunday_hours || 0),
+          holiday: Number(payroll.hours?.holiday_hours || 0),
+          premium100: Number(payroll.hours?.premium_100_hours || 0),
+          sick: Number(payroll.hours?.sick_hours || 0),
+          vacation: Number(payroll.hours?.vacation_hours || 0),
+          vv: Number(payroll.hours?.vv_days || 0),
+          overtime: Number(payroll.overtime_hours || 0),
+          bankDelta: Number(payroll.bank_delta || 0),
+          bankBalance: Number(payroll.bank_balance || 0),
+          grossPay: Number(payroll.gross_pay || 0),
+        }));
+        setRows(snapshotRows);
+        setLoading(false);
+        return;
+      }
+
       const settings = await getPayrollSettings(restaurantId);
       const [shifts, specialDays, rotaPeriods, adjustments] = await Promise.all([
         listPayrollShifts(restaurantId, period.start, period.end),
@@ -295,9 +340,16 @@ export function ReportsPage() {
   }
 
   function exportCsv() {
+    const totalValues = reportKind === "hours"
+      ? ["Total", hours(totals.baseHours), hours(totals.workedHours), hours(totals.evening), hours(totals.night), hours(totals.sunday), hours(totals.holiday), hours(totals.premium100), hours(totals.sick), hours(totals.vacation), hours(totals.vv)]
+      : reportKind === "labor"
+        ? ["Total", "—", hours(totals.workedHours), hours(totals.overtime), hours(totals.bankDelta), hours(totals.bankBalance), round2(totals.basePay), round2(totals.grossPay)]
+        : ["Total", "—", hours(totals.baseHours), hours(totals.workedHours), hours(totals.evening), hours(totals.night), hours(totals.sunday), hours(totals.holiday), hours(totals.premium100), hours(totals.sick), hours(totals.vacation), hours(totals.vv), hours(totals.overtime), hours(totals.bankDelta), round2(totals.basePay), round2(totals.grossPay)];
     const lines = [
+      ["The Set Helsinki Enterprise", restaurantName, `${period.start} → ${period.end}`, activePeriodRecord?.status?.toUpperCase() || "OPEN"].map(csvCell).join(","),
       reportHeaders().map(csvCell).join(","),
       ...rows.map(row => reportValues(row).map(csvCell).join(",")),
+      totalValues.map(csvCell).join(","),
     ];
     downloadBlob(
       "\uFEFF" + lines.join("\n"),
@@ -314,10 +366,11 @@ export function ReportsPage() {
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"></head><body>
 <h2>The Set Helsinki Enterprise</h2>
-<p>${restaurantName} · ${period.start} → ${period.end}</p>
+<p>${restaurantName} · ${period.start} → ${period.end} · ${(activePeriodRecord?.status || "open").toUpperCase()}</p>
 <table border="1">
 <thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>
 <tbody>${tableRows}</tbody>
+<tfoot><tr><th>Total</th><td colspan="${Math.max(1, headers.length - 2)}"></td><th>${reportKind === "hours" ? hours(totals.workedHours) + " h" : money(totals.grossPay, locale)}</th></tr></tfoot>
 </table>
 </body></html>`;
     downloadBlob(
@@ -362,6 +415,26 @@ export function ReportsPage() {
           </select>
         </label>
 
+        <label>
+          Payroll history
+          <select
+            value={`${period.start}|${period.end}`}
+            onChange={e => {
+              const [start, end] = e.target.value.split("|");
+              if (start && end) setPeriod({ start, end });
+            }}
+          >
+            <option value={`${period.start}|${period.end}`}>Current: {period.start} → {period.end}</option>
+            {periodRecords
+              .filter(r => !(r.period_start === period.start && r.period_end === period.end))
+              .map(r => (
+                <option key={r.id} value={`${r.period_start}|${r.period_end}`}>
+                  {r.status === "closed" ? "🔒" : "○"} {r.period_start} → {r.period_end}
+                </option>
+              ))}
+          </select>
+        </label>
+
         <button className="secondary" onClick={() => setPeriod(movePayrollPeriod(period, -1, 21))}>← Previous</button>
         <div className="reports-period">{period.start} → {period.end}</div>
         <button className="secondary" onClick={() => setPeriod(movePayrollPeriod(period, 1, 21))}>Next →</button>
@@ -378,6 +451,9 @@ export function ReportsPage() {
           <div>
             <strong>{restaurantName}</strong>
             <span>{period.start} → {period.end}</span>
+            <span className={`report-status ${activePeriodRecord?.status === "closed" ? "closed" : "open"}`}>
+              {activePeriodRecord?.status === "closed" ? "CLOSED · historical snapshot" : "OPEN · live calculation"}
+            </span>
           </div>
         </div>
 
@@ -455,6 +531,7 @@ export function ReportsPage() {
       <p className="reports-note no-print">
         “Print / PDF” opens the browser print dialog. Choose “Save as PDF” to create a PDF.
         Excel export uses an Excel-compatible .xls file and does not require an extra JavaScript library.
+        Closed payroll periods are exported from the stored historical snapshot; open periods are calculated from current rota data.
       </p>
     </div>
   );

@@ -44,7 +44,7 @@ export function ProductionPage({ embedded = false }: { embedded?: boolean } = {}
       <div className="page-header">
         <div>
           <h1>{embedded ? "System status" : "Production status"}</h1>
-          <p className="muted">Production readiness checks for The Set Helsinki Enterprise 5.1.</p>
+          <p className="muted">Production readiness checks for The Set Helsinki Enterprise 5.5.</p>
         </div>
         <button className="secondary" onClick={() => void runChecks()}>Run checks</button>
       </div>
