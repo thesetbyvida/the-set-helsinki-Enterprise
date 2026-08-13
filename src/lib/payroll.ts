@@ -276,3 +276,106 @@ export function calculatePayrollRow(
     gross_pay: money2(gross),
   };
 }
+
+export type PayrollPeriodStatus = "open" | "closed";
+
+export interface PayrollPeriodRecord {
+  id: string;
+  restaurant_id: string;
+  period_start: string;
+  period_end: string;
+  status: PayrollPeriodStatus;
+  rows_snapshot: PayrollRow[];
+  totals_snapshot: Record<string, number>;
+  settings_snapshot: Partial<PayrollSettings>;
+  closed_by: string | null;
+  closed_at: string | null;
+  reopened_by: string | null;
+  reopened_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getPayrollPeriodRecord(
+  restaurantId: string,
+  start: string,
+  end: string
+): Promise<PayrollPeriodRecord | null> {
+  const { data, error } = await supabase
+    .from("payroll_periods")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .eq("period_start", start)
+    .eq("period_end", end)
+    .maybeSingle();
+  if (error) throw error;
+  return data as PayrollPeriodRecord | null;
+}
+
+export async function listPayrollPeriodRecords(restaurantId: string): Promise<PayrollPeriodRecord[]> {
+  const { data, error } = await supabase
+    .from("payroll_periods")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("period_start", { ascending: false })
+    .limit(60);
+  if (error) throw error;
+  return (data || []) as PayrollPeriodRecord[];
+}
+
+export async function closePayrollPeriod(input: {
+  restaurantId: string;
+  start: string;
+  end: string;
+  rows: PayrollRow[];
+  totals: Record<string, number>;
+  settings: PayrollSettings;
+  userId?: string | null;
+}): Promise<PayrollPeriodRecord> {
+  const now = new Date().toISOString();
+  const payload = {
+    restaurant_id: input.restaurantId,
+    period_start: input.start,
+    period_end: input.end,
+    status: "closed",
+    rows_snapshot: input.rows,
+    totals_snapshot: input.totals,
+    settings_snapshot: input.settings,
+    closed_by: input.userId || null,
+    closed_at: now,
+    reopened_by: null,
+    reopened_at: null,
+    updated_at: now,
+  };
+  const { data, error } = await supabase
+    .from("payroll_periods")
+    .upsert(payload, { onConflict: "restaurant_id,period_start,period_end" })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as PayrollPeriodRecord;
+}
+
+export async function reopenPayrollPeriod(input: {
+  restaurantId: string;
+  start: string;
+  end: string;
+  userId?: string | null;
+}): Promise<PayrollPeriodRecord> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("payroll_periods")
+    .update({
+      status: "open",
+      reopened_by: input.userId || null,
+      reopened_at: now,
+      updated_at: now,
+    })
+    .eq("restaurant_id", input.restaurantId)
+    .eq("period_start", input.start)
+    .eq("period_end", input.end)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as PayrollPeriodRecord;
+}
