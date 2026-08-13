@@ -53,12 +53,15 @@ export default function EmployeePortalPage() {
     setLoading(true);
     setError("");
     try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      const client = supabase;
+      if (!client) throw new Error("Supabase is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY / VITE_SUPABASE_PUBLISHABLE_KEY.");
+
+      const { data: authData, error: authErr } = await client.auth.getUser();
       if (authErr) throw authErr;
       const user = authData.user;
       if (!user) throw new Error("Not signed in.");
 
-      const { data: p, error: pErr } = await supabase
+      const { data: p, error: pErr } = await client
         .from("profiles")
         .select("id,full_name,email,role")
         .eq("id", user.id)
@@ -68,7 +71,7 @@ export default function EmployeePortalPage() {
 
       let emp: any = null;
       if (p?.email) {
-        const { data: e, error: eErr } = await supabase
+        const { data: e, error: eErr } = await client
           .from("employees")
           .select("id,name,email,hours_bank")
           .eq("email", p.email)
@@ -86,7 +89,7 @@ export default function EmployeePortalPage() {
         to.setDate(to.getDate() + 35);
         const iso = (d: Date) => d.toISOString().slice(0,10);
 
-        const { data: s, error: sErr } = await supabase
+        const { data: s, error: sErr } = await client
           .from("rota_shifts")
           .select("id,shift_date,start_time,end_time,code,notes,restaurant_id")
           .eq("employee_id", emp.id)
@@ -98,13 +101,13 @@ export default function EmployeePortalPage() {
         const restIds = [...new Set((s || []).map((x:any)=>x.restaurant_id).filter(Boolean))];
         let restMap: Record<string,string> = {};
         if (restIds.length) {
-          const { data: rs } = await supabase.from("restaurants").select("id,name").in("id", restIds);
+          const { data: rs } = await client.from("restaurants").select("id,name").in("id", restIds);
           restMap = Object.fromEntries((rs || []).map((r:any)=>[r.id,r.name]));
         }
         setShifts((s || []).map((x:any)=>({ ...x, restaurant_name: restMap[x.restaurant_id] || null })));
 
         const year = new Date().getFullYear();
-        const { data: tx } = await supabase
+        const { data: tx } = await client
           .from("vv_transactions")
           .select("type,generated,used,date")
           .eq("employee_id", emp.id)

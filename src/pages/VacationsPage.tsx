@@ -43,12 +43,15 @@ export default function VacationsPage() {
     setLoading(true);
     setError("");
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const client = supabase;
+      if (!client) throw new Error("Supabase is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY / VITE_SUPABASE_PUBLISHABLE_KEY.");
+
+      const { data: authData, error: authError } = await client.auth.getUser();
       if (authError) throw authError;
       const user = authData.user;
       if (!user) throw new Error("Not signed in.");
 
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile, error: profileError } = await client
         .from("profiles")
         .select("id,email,role")
         .eq("id", user.id)
@@ -60,7 +63,7 @@ export default function VacationsPage() {
 
       let emp: Employee | null = null;
       if (profile?.email) {
-        const { data: employeeData, error: employeeError } = await supabase
+        const { data: employeeData, error: employeeError } = await client
           .from("employees")
           .select("id,name,email")
           .eq("email", profile.email)
@@ -71,7 +74,7 @@ export default function VacationsPage() {
       }
 
       if (admin) {
-        const { data: reqs, error: reqError } = await supabase
+        const { data: reqs, error: reqError } = await client
           .from("employee_requests")
           .select("id,employee_id,request_type,start_date,end_date,message,status,created_at")
           .order("created_at", { ascending: false });
@@ -80,12 +83,12 @@ export default function VacationsPage() {
         const employeeIds = [...new Set((reqs || []).map((r:any)=>r.employee_id).filter(Boolean))];
         let names: Record<string,string> = {};
         if (employeeIds.length) {
-          const { data: emps } = await supabase.from("employees").select("id,name").in("id", employeeIds);
+          const { data: emps } = await client.from("employees").select("id,name").in("id", employeeIds);
           names = Object.fromEntries((emps || []).map((e:any)=>[e.id,e.name]));
         }
         setRequests((reqs || []).map((r:any)=>({ ...r, employee_name: names[r.employee_id] || null })));
       } else if (emp?.id) {
-        const { data: reqs, error: reqError } = await supabase
+        const { data: reqs, error: reqError } = await client
           .from("employee_requests")
           .select("id,employee_id,request_type,start_date,end_date,message,status,created_at")
           .eq("employee_id", emp.id)
@@ -116,7 +119,9 @@ export default function VacationsPage() {
     setError("");
     setSuccess("");
     try {
-      const { error: insertError } = await supabase.from("employee_requests").insert({
+      const client = supabase;
+      if (!client) throw new Error("Supabase is not configured. Check environment variables.");
+      const { error: insertError } = await client.from("employee_requests").insert({
         employee_id: employee.id,
         request_type: type,
         start_date: startDate,
@@ -141,7 +146,9 @@ export default function VacationsPage() {
     setError("");
     setSuccess("");
     try {
-      const { error: updateError } = await supabase
+      const client = supabase;
+      if (!client) throw new Error("Supabase is not configured. Check environment variables.");
+      const { error: updateError } = await client
         .from("employee_requests")
         .update({ status, updated_at: new Date().toISOString() })
         .eq("id", id);
@@ -157,7 +164,9 @@ export default function VacationsPage() {
     setError("");
     setSuccess("");
     try {
-      const { error: updateError } = await supabase
+      const client = supabase;
+      if (!client) throw new Error("Supabase is not configured. Check environment variables.");
+      const { error: updateError } = await client
         .from("employee_requests")
         .update({ status: "cancelled", updated_at: new Date().toISOString() })
         .eq("id", id);
