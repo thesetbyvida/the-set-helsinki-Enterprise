@@ -13,6 +13,7 @@ import { PayrollPage } from "./pages/PayrollPage";
 import { VvPage } from "./pages/VvPage";
 import EmployeePortalPage from "./pages/EmployeePortalPage";
 import VacationsPage from "./pages/VacationsPage";
+import { ReportsPage } from "./pages/ReportsPage";
 
 export default function App() {
   const {
@@ -87,9 +88,9 @@ export default function App() {
         if (page === "hourcalc") return <HourCalcPage />;
         if (page === "payroll") return <PayrollPage />;
         if (page === "vv") return <VvPage />;
+        if (page === "reports") return <ReportsPage />;
 
         const descriptions: Record<string, string> = {
-          reports: "Phase 12",
           settings: "Phase 13",
         };
 
