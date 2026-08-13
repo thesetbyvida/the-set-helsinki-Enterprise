@@ -17,12 +17,21 @@ type RequestRow = {
   created_at: string;
   reviewed_at: string | null;
   employee_name?: string | null;
+  restaurant_id: string | null;
+  restaurant_name?: string | null;
+  applied_to_rota: boolean;
+  applied_at: string | null;
 };
 
 type Employee = {
   id: string;
   name: string;
   email: string | null;
+};
+
+type Restaurant = {
+  id: string;
+  name: string;
 };
 
 function errorText(error: any) {
@@ -43,6 +52,7 @@ function requestLabel(value: string) {
 export default function VacationsPage() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +66,7 @@ export default function VacationsPage() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [message, setMessage] = useState("");
+  const [restaurantId, setRestaurantId] = useState("");
 
   useEffect(() => { void load(); }, []);
 
@@ -93,7 +104,31 @@ export default function VacationsPage() {
         setEmployee(emp);
       }
 
-      const selectFields = "id,employee_id,request_type,start_date,end_date,requested_start_time,requested_end_time,message,admin_note,status,created_at,reviewed_at";
+      if (emp?.id) {
+        const { data: links, error: linkError } = await client
+          .from("employee_restaurants")
+          .select("restaurant_id")
+          .eq("employee_id", emp.id);
+        if (linkError) throw linkError;
+        const restaurantIds = (links || []).map((x:any) => x.restaurant_id).filter(Boolean);
+        if (restaurantIds.length) {
+          const { data: rs, error: restaurantError } = await client
+            .from("restaurants")
+            .select("id,name")
+            .in("id", restaurantIds)
+            .order("name");
+          if (restaurantError) throw restaurantError;
+          const available = (rs || []) as Restaurant[];
+          setRestaurants(available);
+          setRestaurantId(prev => prev || (available.length === 1 ? available[0].id : ""));
+        } else {
+          setRestaurants([]);
+        }
+      } else {
+        setRestaurants([]);
+      }
+
+      const selectFields = "id,employee_id,restaurant_id,request_type,start_date,end_date,requested_start_time,requested_end_time,message,admin_note,status,created_at,reviewed_at,applied_to_rota,applied_at";
 
       if (admin) {
         const { data: reqs, error: reqError } = await client
@@ -108,7 +143,17 @@ export default function VacationsPage() {
           const { data: emps } = await client.from("employees").select("id,name").in("id", employeeIds);
           names = Object.fromEntries((emps || []).map((e:any)=>[e.id,e.name]));
         }
-        const rows = (reqs || []).map((r:any)=>({ ...r, employee_name: names[r.employee_id] || null })) as RequestRow[];
+        const requestRestaurantIds = [...new Set((reqs || []).map((r:any)=>r.restaurant_id).filter(Boolean))];
+        let restaurantNames: Record<string,string> = {};
+        if (requestRestaurantIds.length) {
+          const { data: rs } = await client.from("restaurants").select("id,name").in("id", requestRestaurantIds);
+          restaurantNames = Object.fromEntries((rs || []).map((r:any)=>[r.id,r.name]));
+        }
+        const rows = (reqs || []).map((r:any)=>({
+          ...r,
+          employee_name: names[r.employee_id] || null,
+          restaurant_name: r.restaurant_id ? restaurantNames[r.restaurant_id] || null : null,
+        })) as RequestRow[];
         setRequests(rows);
         setAdminNotes(Object.fromEntries(rows.map(r => [r.id, r.admin_note || ""])));
       } else if (emp?.id) {
@@ -118,7 +163,18 @@ export default function VacationsPage() {
           .eq("employee_id", emp.id)
           .order("created_at", { ascending: false });
         if (reqError) throw reqError;
-        setRequests((reqs || []).map((r:any)=>({ ...r, employee_name: emp!.name })) as RequestRow[]);
+        const ownNames = Object.fromEntries(restaurants.map(r => [r.id, r.name]));
+        const restaurantIds = [...new Set((reqs || []).map((r:any)=>r.restaurant_id).filter(Boolean))];
+        let requestNames = ownNames;
+        if (restaurantIds.length) {
+          const { data: rs } = await client.from("restaurants").select("id,name").in("id", restaurantIds);
+          requestNames = { ...requestNames, ...Object.fromEntries((rs || []).map((r:any)=>[r.id,r.name])) };
+        }
+        setRequests((reqs || []).map((r:any)=>({
+          ...r,
+          employee_name: emp!.name,
+          restaurant_name: r.restaurant_id ? requestNames[r.restaurant_id] || null : null,
+        })) as RequestRow[]);
       } else {
         setRequests([]);
       }
@@ -133,6 +189,10 @@ export default function VacationsPage() {
     e.preventDefault();
     if (!employee) {
       setError("Your login email is not linked to an employee record.");
+      return;
+    }
+    if (!restaurantId) {
+      setError("Restaurant is required.");
       return;
     }
     if (!startDate) {
@@ -152,6 +212,7 @@ export default function VacationsPage() {
       const showTimes = type === "shift_change" || type === "availability";
       const { error: insertError } = await client.from("employee_requests").insert({
         employee_id: employee.id,
+        restaurant_id: restaurantId,
         request_type: type,
         start_date: startDate,
         end_date: endDate || startDate,
@@ -175,7 +236,7 @@ export default function VacationsPage() {
     }
   }
 
-  async function setStatus(id: string, status: "approved" | "rejected") {
+  async function setStatus(id: string, status: "approved" | "rejected", applyToRota = false) {
     setError("");
     setSuccess("");
     try {
@@ -185,9 +246,12 @@ export default function VacationsPage() {
         p_request_id: id,
         p_status: status,
         p_admin_note: adminNotes[id] || null,
+        p_apply_to_rota: applyToRota,
       });
       if (updateError) throw updateError;
-      setSuccess(status === "approved" ? "Request approved." : "Request rejected.");
+      setSuccess(status === "approved"
+        ? (applyToRota ? "Request approved and applied to rota." : "Request approved.")
+        : "Request rejected.");
       await load();
     } catch (e:any) {
       setError(errorText(e));
@@ -256,6 +320,13 @@ export default function VacationsPage() {
           )}
           <form className="request-form-grid" onSubmit={submitRequest}>
             <label>
+              Restaurant
+              <select value={restaurantId} onChange={e => setRestaurantId(e.target.value)} required>
+                <option value="">Select restaurant</option>
+                {restaurants.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </label>
+            <label>
               Type
               <select value={type} onChange={e => setType(e.target.value)}>
                 <option value="vacation">Vacation</option>
@@ -314,11 +385,13 @@ export default function VacationsPage() {
               <thead>
                 <tr>
                   {isAdmin && <th>Employee</th>}
+                  <th>Restaurant</th>
                   <th>Type</th>
                   <th>Dates</th>
                   <th>Requested time</th>
                   <th>Message</th>
                   <th>Status</th>
+                  <th>Rota</th>
                   <th>Admin note</th>
                   <th>Created</th>
                   <th></th>
@@ -328,11 +401,13 @@ export default function VacationsPage() {
                 {requests.map(r => (
                   <tr key={r.id}>
                     {isAdmin && <td><strong>{r.employee_name || "—"}</strong></td>}
+                    <td>{r.restaurant_name || "—"}</td>
                     <td>{requestLabel(r.request_type)}</td>
                     <td>{r.start_date || "—"}{r.end_date && r.end_date !== r.start_date ? ` → ${r.end_date}` : ""}</td>
                     <td>{r.requested_start_time ? `${r.requested_start_time.slice(0,5)}${r.requested_end_time ? `–${r.requested_end_time.slice(0,5)}` : ""}` : "—"}</td>
                     <td>{r.message || ""}</td>
                     <td><span className={`status-pill status-${r.status}`}>{r.status}</span></td>
+                    <td>{r.applied_to_rota ? <span className="status-pill status-approved">Applied</span> : "—"}</td>
                     <td>
                       {isAdmin && r.status === "pending" ? (
                         <input
@@ -348,6 +423,16 @@ export default function VacationsPage() {
                       {isAdmin && r.status === "pending" && (
                         <>
                           <button className="primary small" onClick={() => void setStatus(r.id, "approved")}>Approve</button>
+                          {(r.request_type === "vacation" || r.request_type === "vv") && (
+                            <button
+                              className="primary small"
+                              disabled={!r.restaurant_id}
+                              title={!r.restaurant_id ? "This older request has no restaurant selected" : "Approve and write VL/VV to the existing rota"}
+                              onClick={() => void setStatus(r.id, "approved", true)}
+                            >
+                              Approve + Rota
+                            </button>
+                          )}
                           <button className="secondary small" onClick={() => void setStatus(r.id, "rejected")}>Reject</button>
                         </>
                       )}

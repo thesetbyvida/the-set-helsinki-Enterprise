@@ -333,7 +333,7 @@ button.small{padding:6px 9px;font-size:12px}
 .request-kpis>div{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:13px;display:grid;gap:4px}
 .request-kpis span{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
 .request-kpis strong{font-size:22px}
-.request-table{min-width:1250px}
+.request-table{min-width:1450px}
 .request-admin-note{min-width:170px}
 .employee-mini-list{display:grid;gap:0}
 .employee-mini-list>div{display:grid;grid-template-columns:minmax(160px,1fr) minmax(140px,1fr) 120px;gap:12px;padding:10px 0;border-bottom:1px solid #eef2f7;align-items:center}
