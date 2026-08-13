@@ -23,6 +23,8 @@ type ReportKind = "payroll" | "hours" | "labor";
 
 type ReportRow = {
   employee: string;
+  payBasis: "hourly" | "monthly";
+  basePay: number;
   baseHours: number;
   workedHours: number;
   evening: number;
@@ -158,6 +160,8 @@ export function ReportsPage() {
 
         return {
           employee: employee.name,
+          payBasis: payroll.pay_basis,
+          basePay: payroll.base_pay,
           baseHours: breakdown.base_hours,
           workedHours: breakdown.worked_hours,
           evening: breakdown.evening_hours,
@@ -190,6 +194,7 @@ export function ReportsPage() {
     () =>
       rows.reduce(
         (a, r) => ({
+          basePay: a.basePay + r.basePay,
           baseHours: a.baseHours + r.baseHours,
           workedHours: a.workedHours + r.workedHours,
           evening: a.evening + r.evening,
@@ -206,6 +211,7 @@ export function ReportsPage() {
           grossPay: a.grossPay + r.grossPay,
         }),
         {
+          basePay: 0,
           baseHours: 0,
           workedHours: 0,
           evening: 0,
@@ -238,12 +244,12 @@ export function ReportsPage() {
       ];
     }
     if (reportKind === "labor") {
-      return ["Employee", "Worked h", "Overtime h", "Bank Δ", "Bank balance", "Gross payroll"];
+      return ["Employee", "Pay basis", "Worked h", "Overtime h", "Bank Δ", "Bank balance", "Base payroll", "Gross payroll"];
     }
     return [
-      "Employee", "Base h", "Worked h", "Evening h", "Night h",
+      "Employee", "Pay basis", "Base h", "Worked h", "Evening h", "Night h",
       "Sunday h", "Holiday h", "100% h", "S h", "VL h", "VV",
-      "Overtime h", "Bank Δ", "Gross payroll",
+      "Overtime h", "Bank Δ", "Base payroll", "Gross payroll",
     ];
   }
 
@@ -257,15 +263,15 @@ export function ReportsPage() {
     }
     if (reportKind === "labor") {
       return [
-        row.employee, hours(row.workedHours), hours(row.overtime),
-        hours(row.bankDelta), hours(row.bankBalance), round2(row.grossPay),
+        row.employee, row.payBasis === "monthly" ? "Monthly" : "Hourly", hours(row.workedHours), hours(row.overtime),
+        hours(row.bankDelta), hours(row.bankBalance), round2(row.basePay), round2(row.grossPay),
       ];
     }
     return [
-      row.employee, hours(row.baseHours), hours(row.workedHours), hours(row.evening),
+      row.employee, row.payBasis === "monthly" ? "Monthly" : "Hourly", hours(row.baseHours), hours(row.workedHours), hours(row.evening),
       hours(row.night), hours(row.sunday), hours(row.holiday), hours(row.premium100),
       hours(row.sick), hours(row.vacation), row.vv, hours(row.overtime),
-      hours(row.bankDelta), round2(row.grossPay),
+      hours(row.bankDelta), round2(row.basePay), round2(row.grossPay),
     ];
   }
 
@@ -395,13 +401,16 @@ export function ReportsPage() {
                     <th>{hours(totals.vv)}</th>
                   </>}
                   {reportKind === "labor" && <>
+                    <th>—</th>
                     <th>{hours(totals.workedHours)}</th>
                     <th>{hours(totals.overtime)}</th>
                     <th>{hours(totals.bankDelta)}</th>
                     <th>{hours(totals.bankBalance)}</th>
+                    <th>{money(totals.basePay, locale)}</th>
                     <th>{money(totals.grossPay, locale)}</th>
                   </>}
                   {reportKind === "payroll" && <>
+                    <th>—</th>
                     <th>{hours(totals.baseHours)}</th>
                     <th>{hours(totals.workedHours)}</th>
                     <th>{hours(totals.evening)}</th>
@@ -414,6 +423,7 @@ export function ReportsPage() {
                     <th>{hours(totals.vv)}</th>
                     <th>{hours(totals.overtime)}</th>
                     <th>{hours(totals.bankDelta)}</th>
+                    <th>{money(totals.basePay, locale)}</th>
                     <th>{money(totals.grossPay, locale)}</th>
                   </>}
                 </tr>

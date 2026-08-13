@@ -28,6 +28,9 @@ export interface PayrollRow {
   overtime_hours: number;
   bank_delta: number;
   bank_balance: number;
+  pay_basis: "hourly" | "monthly";
+  reference_hourly_rate: number;
+  monthly_salary: number;
   base_pay: number;
   evening_pay: number;
   night_pay: number;
@@ -148,10 +151,25 @@ export function calculatePayrollRow(
   adjustmentsPay = 0
 ): PayrollRow {
   const hourlyRate = Number(employee.hourly_rate || 0);
-  const basePay = employee.contract_type === "monthly" ? Number(employee.monthly_salary || 0) : hours.base_hours * hourlyRate;
+  const monthlySalary = Number(employee.monthly_salary || 0);
+  const isMonthly = employee.contract_type === "monthly" || monthlySalary > 0;
+
+  // Monthly employees receive the configured fixed monthly salary for a full payroll period.
+  // For percentage-based supplements (Sunday/holiday 100%), prefer an explicitly configured
+  // hourly rate. If none is stored, derive a reference rate from the employee's contracted
+  // 3-week hours (e.g. 112.5 h / 3 weeks -> 162.5 h/month).
+  const contractHours3w = Number(employee.contract_hours || 0);
+  const monthlyEquivalentHours = contractHours3w > 0 ? contractHours3w * 52 / 36 : 0;
+  const referenceHourlyRate = hourlyRate > 0
+    ? hourlyRate
+    : (isMonthly && monthlySalary > 0 && monthlyEquivalentHours > 0
+      ? monthlySalary / monthlyEquivalentHours
+      : 0);
+
+  const basePay = isMonthly ? monthlySalary : hours.base_hours * hourlyRate;
   const eveningPay = hours.evening_hours * Number(settings.evening_eur_per_hour || 0);
   const nightPay = hours.night_hours * Number(settings.night_eur_per_hour || 0);
-  const premium100Pay = hours.premium_100_hours * hourlyRate;
+  const premium100Pay = hours.premium_100_hours * referenceHourlyRate;
   const evePay = hours.eve_hours * Number(settings.eve_eur_per_hour || 0);
   // Base pay already contains every worked hour. This is only an EXTRA overtime supplement.
   const overtimePay = overtime.overtime_hours * Number(settings.overtime_eur_per_hour || 0);
@@ -162,6 +180,9 @@ export function calculatePayrollRow(
     overtime_hours: overtime.overtime_hours,
     bank_delta: overtime.bank_delta,
     bank_balance: round2(Number(employee.bank_hours || 0) + overtime.bank_delta),
+    pay_basis: isMonthly ? "monthly" : "hourly",
+    reference_hourly_rate: money2(referenceHourlyRate),
+    monthly_salary: money2(monthlySalary),
     base_pay: money2(basePay), evening_pay: money2(eveningPay), night_pay: money2(nightPay),
     premium_100_pay: money2(premium100Pay), eve_pay: money2(evePay), overtime_pay: money2(overtimePay),
     adjustments_pay: money2(adjustmentsPay), gross_pay: money2(gross),
