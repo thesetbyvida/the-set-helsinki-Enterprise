@@ -70,6 +70,7 @@ export interface RotaShift {
   restaurant_id: string;
   employee_id: string;
   shift_date: string;
+  shift_slot: number;
   start_time: string | null;
   end_time: string | null;
   code: string;

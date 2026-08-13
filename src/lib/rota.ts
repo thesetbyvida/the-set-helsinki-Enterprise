@@ -4,8 +4,6 @@ import type { RotaPeriod, RotaShift } from "../types/app";
 export type ShiftDraft = Pick<RotaShift, "start_time" | "end_time" | "code" | "note">;
 
 export async function getOrCreateRotaPeriod(restaurantId: string, startDate: string): Promise<RotaPeriod> {
-  if (!supabase) throw new Error("Supabase is not configured");
-
   const { data: existing, error: selectError } = await supabase
     .from("rota_periods")
     .select("*")
@@ -31,7 +29,6 @@ export async function getOrCreateRotaPeriod(restaurantId: string, startDate: str
 }
 
 export async function findRotaPeriod(restaurantId: string, startDate: string): Promise<RotaPeriod | null> {
-  if (!supabase) return null;
   const { data, error } = await supabase
     .from("rota_periods")
     .select("*")
@@ -43,11 +40,12 @@ export async function findRotaPeriod(restaurantId: string, startDate: string): P
 }
 
 export async function listRotaShifts(periodId: string): Promise<RotaShift[]> {
-  if (!supabase) return [];
   const { data, error } = await supabase
     .from("rota_shifts")
     .select("*")
-    .eq("period_id", periodId);
+    .eq("period_id", periodId)
+    .order("shift_date", { ascending: true })
+    .order("shift_slot", { ascending: true });
   if (error) throw error;
   return (data || []) as RotaShift[];
 }
@@ -56,10 +54,9 @@ export async function saveRotaShift(
   period: RotaPeriod,
   employeeId: string,
   date: string,
+  shiftSlot: number,
   draft: ShiftDraft
 ) {
-  if (!supabase) throw new Error("Supabase is not configured");
-
   const code = draft.code.trim().toLowerCase();
   const hasContent = Boolean(draft.start_time || draft.end_time || code || draft.note.trim());
 
@@ -69,7 +66,8 @@ export async function saveRotaShift(
       .delete()
       .eq("period_id", period.id)
       .eq("employee_id", employeeId)
-      .eq("shift_date", date);
+      .eq("shift_date", date)
+      .eq("shift_slot", shiftSlot);
     if (error) throw error;
     return;
   }
@@ -80,13 +78,14 @@ export async function saveRotaShift(
       restaurant_id: period.restaurant_id,
       employee_id: employeeId,
       shift_date: date,
+      shift_slot: shiftSlot,
       start_time: draft.start_time || null,
       end_time: draft.end_time || null,
       code,
       note: draft.note.trim(),
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "period_id,employee_id,shift_date" }
+    { onConflict: "period_id,employee_id,shift_date,shift_slot" }
   );
   if (error) throw error;
 }
@@ -124,7 +123,7 @@ export function shiftHours(shift?: ShiftDraft): number {
 
   const [sh, sm] = shift.start_time.slice(0, 5).split(":").map(Number);
   const [eh, em] = shift.end_time.slice(0, 5).split(":").map(Number);
-  let start = sh * 60 + sm;
+  const start = sh * 60 + sm;
   let end = eh * 60 + em;
   if (end < start) end += 24 * 60;
   return Math.max(0, (end - start) / 60);

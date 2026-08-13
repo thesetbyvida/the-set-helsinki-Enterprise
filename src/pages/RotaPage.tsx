@@ -21,9 +21,15 @@ import type { Employee, EmployeeRestaurant, Restaurant, RotaPeriod } from "../ty
 type ShiftMap = Record<string, ShiftDraft>;
 const EMPTY_SHIFT: ShiftDraft = { start_time: null, end_time: null, code: "", note: "" };
 const CODES = ["", "s", "vl", "vv", "v", "vp"];
+const MAX_SHIFTS_PER_DAY = 4;
 
-function cellKey(employeeId: string, date: string) {
-  return `${employeeId}__${date}`;
+function shiftKey(employeeId: string, date: string, slot = 1) {
+  return `${employeeId}__${date}__${slot}`;
+}
+
+function parseShiftKey(key: string) {
+  const [employeeId, date, slot] = key.split("__");
+  return { employeeId, date, slot: Number(slot || 1) };
 }
 
 function hoursLabel(value: number) {
@@ -42,6 +48,7 @@ export function RotaPage() {
   const [period, setPeriod] = useState<RotaPeriod | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
   const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [visibleExtraSlots, setVisibleExtraSlots] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -50,6 +57,8 @@ export function RotaPage() {
   const [draggedEmployeeId, setDraggedEmployeeId] = useState<string | null>(null);
 
   const locale = language === "fi" ? "fi-FI" : language === "en" ? "en-GB" : "es-ES";
+  const addShiftLabel = language === "fi" ? "Lisää vuoro" : language === "es" ? "Agregar turno" : "Add shift";
+  const removeShiftLabel = language === "fi" ? "Poista vuoro" : language === "es" ? "Eliminar turno" : "Remove shift";
 
   useEffect(() => {
     if (!message) return;
@@ -104,6 +113,7 @@ export function RotaPage() {
         setError("");
         setMessage("");
         setDirty(new Set());
+        setVisibleExtraSlots(new Set());
         const found = await findRotaPeriod(restaurantId, startDate);
         setPeriod(found);
         if (!found) {
@@ -112,15 +122,19 @@ export function RotaPage() {
         }
         const rows = await listRotaShifts(found.id);
         const next: ShiftMap = {};
+        const extras = new Set<string>();
         for (const row of rows) {
-          next[cellKey(row.employee_id, row.shift_date)] = {
+          const slot = Number(row.shift_slot || 1);
+          next[shiftKey(row.employee_id, row.shift_date, slot)] = {
             start_time: row.start_time ? displayTime(row.start_time) : null,
             end_time: row.end_time ? displayTime(row.end_time) : null,
             code: row.code || "",
             note: row.note || "",
           };
+          if (slot > 1) extras.add(shiftKey(row.employee_id, row.shift_date, slot));
         }
         setShifts(next);
+        setVisibleExtraSlots(extras);
       } catch (e) {
         setError(formatError(e));
       } finally {
@@ -129,10 +143,45 @@ export function RotaPage() {
     })();
   }, [restaurantId, startDate]);
 
-  function updateShift(employeeId: string, date: string, patch: Partial<ShiftDraft>) {
+  function updateShift(employeeId: string, date: string, slot: number, patch: Partial<ShiftDraft>) {
     if (!canEdit) return;
-    const key = cellKey(employeeId, date);
+    const key = shiftKey(employeeId, date, slot);
     setShifts((current) => ({ ...current, [key]: { ...(current[key] || EMPTY_SHIFT), ...patch } }));
+    setDirty((current) => new Set(current).add(key));
+    if (slot > 1) setVisibleExtraSlots((current) => new Set(current).add(key));
+    setMessage("");
+  }
+
+  function slotsForCell(employeeId: string, date: string) {
+    const result = [1];
+    for (let slot = 2; slot <= MAX_SHIFTS_PER_DAY; slot += 1) {
+      const key = shiftKey(employeeId, date, slot);
+      const draft = shifts[key];
+      const hasContent = Boolean(draft && (draft.start_time || draft.end_time || draft.code || draft.note));
+      if (visibleExtraSlots.has(key) || hasContent) result.push(slot);
+    }
+    return result;
+  }
+
+  function addShift(employeeId: string, date: string) {
+    if (!canEdit) return;
+    const currentSlots = slotsForCell(employeeId, date);
+    const nextSlot = Array.from({ length: MAX_SHIFTS_PER_DAY }, (_, i) => i + 1).find((slot) => !currentSlots.includes(slot));
+    if (!nextSlot) return;
+    const key = shiftKey(employeeId, date, nextSlot);
+    setVisibleExtraSlots((current) => new Set(current).add(key));
+    setShifts((current) => ({ ...current, [key]: current[key] || { ...EMPTY_SHIFT } }));
+  }
+
+  function removeShift(employeeId: string, date: string, slot: number) {
+    if (!canEdit || slot === 1) return;
+    const key = shiftKey(employeeId, date, slot);
+    setShifts((current) => ({ ...current, [key]: { ...EMPTY_SHIFT } }));
+    setVisibleExtraSlots((current) => {
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
     setDirty((current) => new Set(current).add(key));
     setMessage("");
   }
@@ -145,8 +194,8 @@ export function RotaPage() {
       const activePeriod = period || (await getOrCreateRotaPeriod(restaurantId, startDate));
       if (!period) setPeriod(activePeriod);
       const tasks = Array.from(dirty).map((key) => {
-        const [employeeId, date] = key.split("__");
-        return saveRotaShift(activePeriod, employeeId, date, shifts[key] || EMPTY_SHIFT);
+        const { employeeId, date, slot } = parseShiftKey(key);
+        return saveRotaShift(activePeriod, employeeId, date, slot, shifts[key] || EMPTY_SHIFT);
       });
       await Promise.all(tasks);
       setDirty(new Set());
@@ -171,8 +220,6 @@ export function RotaPage() {
     if (!canReorder || !restaurantId || employeeIds.length < 2) return;
     const previousAssignments = employeeRestaurants;
     const position = new Map(employeeIds.map((id, index) => [id, index + 1]));
-
-    // Optimistic update so the rota moves immediately on screen.
     setEmployeeRestaurants((current) =>
       current.map((item) =>
         item.restaurant_id === restaurantId && position.has(item.employee_id)
@@ -180,13 +227,10 @@ export function RotaPage() {
           : item
       )
     );
-
     try {
       setOrdering(true);
       setError("");
       await saveRestaurantEmployeeOrder(restaurantId, employeeIds);
-      // Re-read the database after saving. This makes the screen reflect the
-      // persisted order instead of relying only on the optimistic React state.
       const freshAssignments = await listEmployeeRestaurants();
       setEmployeeRestaurants(freshAssignments);
       setMessage(language === "fi" ? "Työntekijöiden järjestys tallennettu." : language === "es" ? "Orden de empleados guardado." : "Employee order saved.");
@@ -256,6 +300,9 @@ export function RotaPage() {
       {error && <div className="alert no-print">{error}</div>}
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
+      <div className="phase-card rota-tip no-print">
+        <strong>Phase 4.7:</strong> {language === "fi" ? "Samalle työntekijälle voi lisätä useita vuoroja samalle päivälle + Vuoro -painikkeella." : language === "es" ? "Puedes agregar varios turnos a la misma persona en el mismo día con + Turno." : "Add multiple shifts for the same employee on the same day with + Shift."}
+      </div>
 
       <div className="print-rota-title">
         <h1>The Set Helsinki — {selectedRestaurant?.name || "Rota"}</h1>
@@ -293,7 +340,9 @@ export function RotaPage() {
                     </thead>
                     <tbody>
                       {restaurantEmployees.map((employee) => {
-                        const weekTotal = weekDates.reduce((sum, date) => sum + shiftHours(shifts[cellKey(employee.id, date)]), 0);
+                        const weekTotal = weekDates.reduce((sum, date) => {
+                          return sum + slotsForCell(employee.id, date).reduce((daySum, slot) => daySum + shiftHours(shifts[shiftKey(employee.id, date, slot)]), 0);
+                        }, 0);
                         return (
                           <tr key={employee.id}>
                             <th
@@ -316,29 +365,58 @@ export function RotaPage() {
                               </div>
                             </th>
                             {weekDates.map((date) => {
-                              const key = cellKey(employee.id, date);
-                              const shift = shifts[key] || EMPTY_SHIFT;
-                              const hours = shiftHours(shift);
+                              const slots = slotsForCell(employee.id, date);
+                              const dayTotal = slots.reduce((sum, slot) => sum + shiftHours(shifts[shiftKey(employee.id, date, slot)]), 0);
+                              const cellDirty = slots.some((slot) => dirty.has(shiftKey(employee.id, date, slot)));
                               return (
-                                <td key={date} className={dirty.has(key) ? "dirty" : ""}>
-                                  <div className="shift-editor no-print">
-                                    <div className="shift-time-row">
-                                      <input aria-label="Start" type="time" value={shift.start_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, { start_time: e.target.value || null })} />
-                                      <span>–</span>
-                                      <input aria-label="End" type="time" value={shift.end_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, { end_time: e.target.value || null })} />
-                                    </div>
-                                    <div className="shift-meta-row">
-                                      <select aria-label="Code" value={shift.code} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, { code: e.target.value })}>
-                                        {CODES.map((code) => <option key={code} value={code}>{code ? code.toUpperCase() : (t.code || "Code")}</option>)}
-                                      </select>
-                                      <input aria-label="Note" type="text" value={shift.note} disabled={!canEdit} placeholder={t.note || "Note"} onChange={(e) => updateShift(employee.id, date, { note: e.target.value })} />
-                                    </div>
-                                    <small>{hoursLabel(hours)}{hours ? " h" : ""}</small>
+                                <td key={date} className={cellDirty ? "dirty" : ""}>
+                                  <div className="multi-shift-editor no-print">
+                                    {slots.map((slot) => {
+                                      const key = shiftKey(employee.id, date, slot);
+                                      const shift = shifts[key] || EMPTY_SHIFT;
+                                      const hours = shiftHours(shift);
+                                      return (
+                                        <div className={`shift-editor ${slot > 1 ? "extra-shift" : ""}`} key={slot}>
+                                          {slot > 1 && (
+                                            <div className="shift-slot-heading">
+                                              <span>{language === "fi" ? `Vuoro ${slot}` : language === "es" ? `Turno ${slot}` : `Shift ${slot}`}</span>
+                                              <button type="button" className="icon-danger" title={removeShiftLabel} aria-label={removeShiftLabel} onClick={() => removeShift(employee.id, date, slot)}>×</button>
+                                            </div>
+                                          )}
+                                          <div className="shift-time-row">
+                                            <input aria-label={`Start ${slot}`} type="time" value={shift.start_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { start_time: e.target.value || null })} />
+                                            <span>–</span>
+                                            <input aria-label={`End ${slot}`} type="time" value={shift.end_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { end_time: e.target.value || null })} />
+                                          </div>
+                                          <div className="shift-meta-row">
+                                            <select aria-label={`Code ${slot}`} value={shift.code} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { code: e.target.value })}>
+                                              {CODES.map((code) => <option key={code} value={code}>{code ? code.toUpperCase() : (t.code || "Code")}</option>)}
+                                            </select>
+                                            <input aria-label={`Note ${slot}`} type="text" value={shift.note} disabled={!canEdit} placeholder={t.note || "Note"} onChange={(e) => updateShift(employee.id, date, slot, { note: e.target.value })} />
+                                          </div>
+                                          <small>{hoursLabel(hours)}{hours ? " h" : ""}</small>
+                                        </div>
+                                      );
+                                    })}
+                                    {canEdit && slots.length < MAX_SHIFTS_PER_DAY && (
+                                      <button type="button" className="add-shift-button" onClick={() => addShift(employee.id, date)}>+ {language === "es" ? "Turno" : language === "fi" ? "Vuoro" : "Shift"}</button>
+                                    )}
+                                    {dayTotal > 0 && slots.length > 1 && <div className="day-shift-total">{language === "es" ? "Día" : language === "fi" ? "Päivä" : "Day"}: {hoursLabel(dayTotal)} h</div>}
                                   </div>
-                                  <div className="print-shift">
-                                    {shift.start_time && shift.end_time && <strong>{displayTime(shift.start_time)}–{displayTime(shift.end_time)}</strong>}
-                                    {shift.code && <span className="print-code">{shift.code.toUpperCase()}</span>}
-                                    {shift.note && <span className="print-note">{shift.note}</span>}
+                                  <div className="print-shift-list">
+                                    {slots.map((slot) => {
+                                      const shift = shifts[shiftKey(employee.id, date, slot)] || EMPTY_SHIFT;
+                                      const hasPrintContent = Boolean(shift.start_time || shift.end_time || shift.code || shift.note);
+                                      if (!hasPrintContent) return null;
+                                      return (
+                                        <div className="print-shift" key={slot}>
+                                          {shift.start_time && shift.end_time && <strong>{displayTime(shift.start_time)}–{displayTime(shift.end_time)}</strong>}
+                                          {shift.code && <span className="print-code">{shift.code.toUpperCase()}</span>}
+                                          {shift.note && <span className="print-note">{shift.note}</span>}
+                                        </div>
+                                      );
+                                    })}
+                                    {slots.length > 1 && dayTotal > 0 && <span className="print-day-total">{hoursLabel(dayTotal)} h</span>}
                                   </div>
                                 </td>
                               );
