@@ -275,3 +275,8 @@ button.small{padding:6px 9px;font-size:12px}
   .report-table th,.report-table td{padding:3px 4px}
   .report-table .report-name,.report-table th:first-child{position:static}
 }
+
+
+/* Enterprise 4.0 Production */
+.production-checklist{display:grid;gap:8px}
+.production-checklist>div{padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
