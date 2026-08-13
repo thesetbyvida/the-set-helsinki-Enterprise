@@ -1,15 +1,21 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+type RequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
 type RequestRow = {
   id: string;
   employee_id: string;
   request_type: string;
   start_date: string | null;
   end_date: string | null;
+  requested_start_time: string | null;
+  requested_end_time: string | null;
   message: string | null;
-  status: "pending" | "approved" | "rejected" | "cancelled";
+  admin_note: string | null;
+  status: RequestStatus;
   created_at: string;
+  reviewed_at: string | null;
   employee_name?: string | null;
 };
 
@@ -23,6 +29,17 @@ function errorText(error: any) {
   return error?.message || error?.details || error?.hint || error?.code || JSON.stringify(error);
 }
 
+function requestLabel(value: string) {
+  const labels: Record<string,string> = {
+    vacation: "Vacation",
+    vv: "VV / annual free day",
+    shift_change: "Shift change",
+    availability: "Availability",
+    other: "Other",
+  };
+  return labels[value] || value.replaceAll("_", " ");
+}
+
 export default function VacationsPage() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [requests, setRequests] = useState<RequestRow[]>([]);
@@ -31,10 +48,13 @@ export default function VacationsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [adminNotes, setAdminNotes] = useState<Record<string,string>>({});
 
   const [type, setType] = useState("vacation");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => { void load(); }, []);
@@ -73,10 +93,12 @@ export default function VacationsPage() {
         setEmployee(emp);
       }
 
+      const selectFields = "id,employee_id,request_type,start_date,end_date,requested_start_time,requested_end_time,message,admin_note,status,created_at,reviewed_at";
+
       if (admin) {
         const { data: reqs, error: reqError } = await client
           .from("employee_requests")
-          .select("id,employee_id,request_type,start_date,end_date,message,status,created_at")
+          .select(selectFields)
           .order("created_at", { ascending: false });
         if (reqError) throw reqError;
 
@@ -86,15 +108,17 @@ export default function VacationsPage() {
           const { data: emps } = await client.from("employees").select("id,name").in("id", employeeIds);
           names = Object.fromEntries((emps || []).map((e:any)=>[e.id,e.name]));
         }
-        setRequests((reqs || []).map((r:any)=>({ ...r, employee_name: names[r.employee_id] || null })));
+        const rows = (reqs || []).map((r:any)=>({ ...r, employee_name: names[r.employee_id] || null })) as RequestRow[];
+        setRequests(rows);
+        setAdminNotes(Object.fromEntries(rows.map(r => [r.id, r.admin_note || ""])));
       } else if (emp?.id) {
         const { data: reqs, error: reqError } = await client
           .from("employee_requests")
-          .select("id,employee_id,request_type,start_date,end_date,message,status,created_at")
+          .select(selectFields)
           .eq("employee_id", emp.id)
           .order("created_at", { ascending: false });
         if (reqError) throw reqError;
-        setRequests((reqs || []).map((r:any)=>({ ...r, employee_name: emp!.name })));
+        setRequests((reqs || []).map((r:any)=>({ ...r, employee_name: emp!.name })) as RequestRow[]);
       } else {
         setRequests([]);
       }
@@ -115,23 +139,32 @@ export default function VacationsPage() {
       setError("Start date is required.");
       return;
     }
+    if (endDate && endDate < startDate) {
+      setError("End date cannot be before start date.");
+      return;
+    }
     setSaving(true);
     setError("");
     setSuccess("");
     try {
       const client = supabase;
       if (!client) throw new Error("Supabase is not configured. Check environment variables.");
+      const showTimes = type === "shift_change" || type === "availability";
       const { error: insertError } = await client.from("employee_requests").insert({
         employee_id: employee.id,
         request_type: type,
         start_date: startDate,
         end_date: endDate || startDate,
+        requested_start_time: showTimes && startTime ? startTime : null,
+        requested_end_time: showTimes && endTime ? endTime : null,
         message: message || null,
         status: "pending",
       });
       if (insertError) throw insertError;
       setStartDate("");
       setEndDate("");
+      setStartTime("");
+      setEndTime("");
       setMessage("");
       setSuccess("Request sent.");
       await load();
@@ -148,10 +181,11 @@ export default function VacationsPage() {
     try {
       const client = supabase;
       if (!client) throw new Error("Supabase is not configured. Check environment variables.");
-      const { error: updateError } = await client
-        .from("employee_requests")
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq("id", id);
+      const { error: updateError } = await client.rpc("review_employee_request", {
+        p_request_id: id,
+        p_status: status,
+        p_admin_note: adminNotes[id] || null,
+      });
       if (updateError) throw updateError;
       setSuccess(status === "approved" ? "Request approved." : "Request rejected.");
       await load();
@@ -169,7 +203,8 @@ export default function VacationsPage() {
       const { error: updateError } = await client
         .from("employee_requests")
         .update({ status: "cancelled", updated_at: new Date().toISOString() })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("status", "pending");
       if (updateError) throw updateError;
       setSuccess("Request cancelled.");
       await load();
@@ -178,7 +213,14 @@ export default function VacationsPage() {
     }
   }
 
-  const pendingCount = useMemo(() => requests.filter(r => r.status === "pending").length, [requests]);
+  const counts = useMemo(() => ({
+    pending: requests.filter(r => r.status === "pending").length,
+    approved: requests.filter(r => r.status === "approved").length,
+    rejected: requests.filter(r => r.status === "rejected").length,
+    cancelled: requests.filter(r => r.status === "cancelled").length,
+  }), [requests]);
+
+  const showTimes = type === "shift_change" || type === "availability";
 
   if (loading) return <div className="page-card"><p>Loading…</p></div>;
 
@@ -188,7 +230,7 @@ export default function VacationsPage() {
         <div>
           <h1>Vacations & requests</h1>
           <p className="muted">
-            {isAdmin ? "Review employee requests." : "Request vacation, availability or a shift change."}
+            {isAdmin ? "Review vacation, VV, availability and shift-change requests." : "Request vacation, VV, availability or a shift change."}
           </p>
         </div>
         <button className="secondary" onClick={() => void load()}>Refresh</button>
@@ -196,6 +238,13 @@ export default function VacationsPage() {
 
       {error && <div className="error-banner">{error}</div>}
       {success && <div className="success-banner">{success}</div>}
+
+      <div className="request-kpis">
+        <div><span>Pending</span><strong>{counts.pending}</strong></div>
+        <div><span>Approved</span><strong>{counts.approved}</strong></div>
+        <div><span>Rejected</span><strong>{counts.rejected}</strong></div>
+        <div><span>Cancelled</span><strong>{counts.cancelled}</strong></div>
+      </div>
 
       {!isAdmin && (
         <section className="page-card">
@@ -210,6 +259,7 @@ export default function VacationsPage() {
               Type
               <select value={type} onChange={e => setType(e.target.value)}>
                 <option value="vacation">Vacation</option>
+                <option value="vv">VV / annual free day</option>
                 <option value="shift_change">Shift change</option>
                 <option value="availability">Availability</option>
                 <option value="other">Other</option>
@@ -223,6 +273,18 @@ export default function VacationsPage() {
               End
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
             </label>
+            {showTimes && (
+              <>
+                <label>
+                  Requested start time
+                  <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                </label>
+                <label>
+                  Requested end time
+                  <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                </label>
+              </>
+            )}
             <label className="request-message">
               Message
               <textarea rows={4} value={message} onChange={e => setMessage(e.target.value)} placeholder="Optional details" />
@@ -240,7 +302,7 @@ export default function VacationsPage() {
         <div className="section-title-row">
           <div>
             <h2>{isAdmin ? "Employee requests" : "My requests"}</h2>
-            <p className="muted">{pendingCount} pending</p>
+            <p className="muted">{counts.pending} pending</p>
           </div>
         </div>
 
@@ -248,14 +310,16 @@ export default function VacationsPage() {
           <p className="muted">No requests.</p>
         ) : (
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table request-table">
               <thead>
                 <tr>
                   {isAdmin && <th>Employee</th>}
                   <th>Type</th>
                   <th>Dates</th>
+                  <th>Requested time</th>
                   <th>Message</th>
                   <th>Status</th>
+                  <th>Admin note</th>
                   <th>Created</th>
                   <th></th>
                 </tr>
@@ -264,10 +328,21 @@ export default function VacationsPage() {
                 {requests.map(r => (
                   <tr key={r.id}>
                     {isAdmin && <td><strong>{r.employee_name || "—"}</strong></td>}
-                    <td>{r.request_type.replace("_", " ")}</td>
+                    <td>{requestLabel(r.request_type)}</td>
                     <td>{r.start_date || "—"}{r.end_date && r.end_date !== r.start_date ? ` → ${r.end_date}` : ""}</td>
+                    <td>{r.requested_start_time ? `${r.requested_start_time.slice(0,5)}${r.requested_end_time ? `–${r.requested_end_time.slice(0,5)}` : ""}` : "—"}</td>
                     <td>{r.message || ""}</td>
                     <td><span className={`status-pill status-${r.status}`}>{r.status}</span></td>
+                    <td>
+                      {isAdmin && r.status === "pending" ? (
+                        <input
+                          className="request-admin-note"
+                          value={adminNotes[r.id] || ""}
+                          onChange={e => setAdminNotes(prev => ({ ...prev, [r.id]: e.target.value }))}
+                          placeholder="Optional note"
+                        />
+                      ) : (r.admin_note || "—")}
+                    </td>
                     <td>{new Date(r.created_at).toLocaleDateString("fi-FI")}</td>
                     <td className="request-actions">
                       {isAdmin && r.status === "pending" && (

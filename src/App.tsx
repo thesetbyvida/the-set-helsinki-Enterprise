@@ -93,6 +93,8 @@ export default function App() {
         if (page === "reports") return <ReportsPage />;
         if (page === "pos") return <PosPage />;
         if (page === "production") return <ProductionPage />;
+        if (page === "mywork") return <EmployeePortalPage />;
+        if (page === "requests") return <VacationsPage />;
 
         const descriptions: Record<string, string> = {
           settings: "Phase 13",
