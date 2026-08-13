@@ -82,6 +82,7 @@ export function RotaPage() {
   const [message, setMessage] = useState("");
   const [ordering, setOrdering] = useState(false);
   const [draggedEmployeeId, setDraggedEmployeeId] = useState<string | null>(null);
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "waiting" | "saving" | "saved" | "error">("idle");
 
   const locale = language === "fi" ? "fi-FI" : language === "en" ? "en-GB" : "es-ES";
   const addShiftLabel = language === "fi" ? "Lisää vuoro" : language === "es" ? "Agregar turno" : "Add shift";
@@ -276,34 +277,74 @@ export function RotaPage() {
         : "There are unsaved changes. Discard them?");
   }
 
-  async function saveAll() {
-    if (!canEdit || !restaurantId || !dirty.size) return;
+  async function saveAll(options: { autosave?: boolean } = {}) {
+    if (!canEdit || !restaurantId || !dirty.size || saving) return;
     if (qaIssues.length) {
-      setError(language === "fi"
-        ? `Korjaa rota ennen tallennusta (${qaIssues.length} ongelmaa).`
-        : language === "es"
-          ? `Corrige el rota antes de guardar (${qaIssues.length} problema${qaIssues.length === 1 ? "" : "s"}).`
-          : `Fix the rota before saving (${qaIssues.length} issue${qaIssues.length === 1 ? "" : "s"}).`);
+      if (!options.autosave) {
+        setError(language === "fi"
+          ? `Korjaa rota ennen tallennusta (${qaIssues.length} ongelmaa).`
+          : language === "es"
+            ? `Corrige el rota antes de guardar (${qaIssues.length} problema${qaIssues.length === 1 ? "" : "s"}).`
+            : `Fix the rota before saving (${qaIssues.length} issue${qaIssues.length === 1 ? "" : "s"}).`);
+      }
       return;
     }
+
+    const keysToSave = Array.from(dirty);
+    const draftsToSave = new Map(keysToSave.map((key) => [key, { ...(shifts[key] || EMPTY_SHIFT) }]));
+
     try {
       setSaving(true);
+      if (options.autosave) setAutosaveStatus("saving");
       setError("");
       const activePeriod = period || (await getOrCreateRotaPeriod(restaurantId, startDate));
       if (!period) setPeriod(activePeriod);
-      const tasks = Array.from(dirty).map((key) => {
+      await Promise.all(keysToSave.map((key) => {
         const { employeeId, date, slot } = parseShiftKey(key);
-        return saveRotaShift(activePeriod, employeeId, date, slot, shifts[key] || EMPTY_SHIFT);
+        return saveRotaShift(activePeriod, employeeId, date, slot, draftsToSave.get(key) || EMPTY_SHIFT);
+      }));
+
+      // Only clear keys whose value has not changed again while the save was running.
+      setDirty((current) => {
+        const next = new Set(current);
+        for (const key of keysToSave) {
+          const savedDraft = draftsToSave.get(key) || EMPTY_SHIFT;
+          const currentDraft = shifts[key] || EMPTY_SHIFT;
+          if (JSON.stringify(savedDraft) === JSON.stringify(currentDraft)) next.delete(key);
+        }
+        return next;
       });
-      await Promise.all(tasks);
-      setDirty(new Set());
-      setMessage(t.rotaSaved || "Rota saved.");
+
+      if (options.autosave) {
+        setAutosaveStatus("saved");
+      } else {
+        setMessage(t.rotaSaved || "Rota saved.");
+      }
     } catch (e) {
       setError(formatError(e));
+      if (options.autosave) setAutosaveStatus("error");
     } finally {
       setSaving(false);
     }
   }
+
+  useEffect(() => {
+    if (!canEdit || !restaurantId || !dirty.size || qaIssues.length || saving) {
+      if (!dirty.size && autosaveStatus === "waiting") setAutosaveStatus("idle");
+      return;
+    }
+    setAutosaveStatus("waiting");
+    const timer = window.setTimeout(() => {
+      void saveAll({ autosave: true });
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [dirty, qaIssues.length, saving, canEdit, restaurantId, shifts]);
+
+  useEffect(() => {
+    if (autosaveStatus !== "saved") return;
+    const timer = window.setTimeout(() => setAutosaveStatus("idle"), 2200);
+    return () => window.clearTimeout(timer);
+  }, [autosaveStatus]);
 
   function changeStart(value: string) {
     if (!value || !confirmDiscardChanges()) return;
@@ -396,7 +437,7 @@ export function RotaPage() {
           </label>
           <button className="secondary" onClick={() => moveWeeks(-21)}>← {t.previous || "Previous"}</button>
           <button className="secondary" onClick={() => moveWeeks(21)}>{t.next || "Next"} →</button>
-          {canEdit && <button disabled={saving || !dirty.size || qaIssues.length > 0} title={qaIssues.length ? (language === "es" ? "Corrige los errores de Rota QA antes de guardar" : language === "fi" ? "Korjaa Rota QA -virheet ennen tallennusta" : "Fix Rota QA issues before saving") : ""} onClick={saveAll}>{saving ? (t.saving || "Saving…") : `${t.save || "Save"}${dirty.size ? ` (${dirty.size})` : ""}`}</button>}
+          {canEdit && <button disabled={saving || !dirty.size || qaIssues.length > 0} title={qaIssues.length ? (language === "es" ? "Corrige los errores de Rota QA antes de guardar" : language === "fi" ? "Korjaa Rota QA -virheet ennen tallennusta" : "Fix Rota QA issues before saving") : ""} onClick={() => void saveAll()}>{saving ? (t.saving || "Saving…") : `${t.save || "Save"}${dirty.size ? ` (${dirty.size})` : ""}`}</button>}
           <button onClick={() => window.print()}>{t.print || "Print"}</button>
         </div>
       </div>
@@ -405,7 +446,7 @@ export function RotaPage() {
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
       <div className="phase-card rota-tip no-print">
-        <strong>Phase 5.3:</strong> {language === "fi" ? "Rota QA tarkistaa puuttuvat ajat, päällekkäiset vuorot ja tallentamattomat muutokset." : language === "es" ? "Rota QA comprueba horas incompletas, turnos superpuestos y cambios sin guardar." : "Rota QA checks incomplete times, overlapping shifts and unsaved changes."}
+        <strong>Phase 6.1:</strong> {language === "fi" ? "Rota tallentuu automaattisesti 1,5 sekunnin kuluttua muutoksista. Rota QA estää virheelliset automaattitallennukset." : language === "es" ? "El Rota se guarda automáticamente 1,5 segundos después de los cambios. Rota QA bloquea el autoguardado si detecta errores." : "Rota autosaves 1.5 seconds after changes. Rota QA blocks autosave when it detects invalid shifts."}
       </div>
 
       <div className={`rota-qa-card no-print ${qaIssues.length ? "has-errors" : "is-ready"}`}>
@@ -416,7 +457,13 @@ export function RotaPage() {
             : (language === "fi" ? "Vuorot läpäisevät perustarkistukset." : language === "es" ? "Los turnos pasan las comprobaciones básicas." : "Shifts pass the basic checks.")}
           </span>
         </div>
-        {dirty.size > 0 && <span className="rota-unsaved">{language === "fi" ? `${dirty.size} tallentamatta` : language === "es" ? `${dirty.size} sin guardar` : `${dirty.size} unsaved`}</span>}
+        <div className="rota-save-status">
+          {qaIssues.length > 0 && dirty.size > 0 && <span className="rota-unsaved">{language === "fi" ? `${dirty.size} odottaa korjausta` : language === "es" ? `${dirty.size} pendiente${dirty.size === 1 ? "" : "s"} de corrección` : `${dirty.size} waiting for QA`}</span>}
+          {!qaIssues.length && autosaveStatus === "waiting" && <span className="rota-autosave pending">{language === "fi" ? "Automaattitallennus…" : language === "es" ? "Autoguardado pendiente…" : "Autosave pending…"}</span>}
+          {autosaveStatus === "saving" && <span className="rota-autosave saving">{language === "fi" ? "Tallennetaan…" : language === "es" ? "Guardando…" : "Saving…"}</span>}
+          {autosaveStatus === "saved" && <span className="rota-autosave saved">{language === "fi" ? "✓ Tallennettu" : language === "es" ? "✓ Guardado" : "✓ Saved"}</span>}
+          {autosaveStatus === "error" && <span className="rota-autosave failed">{language === "fi" ? "⚠ Ei tallennettu" : language === "es" ? "⚠ No guardado" : "⚠ Not saved"}</span>}
+        </div>
       </div>
 
       <div className="print-rota-title">

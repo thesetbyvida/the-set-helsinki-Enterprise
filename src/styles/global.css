@@ -369,3 +369,5 @@ button.small{padding:6px 9px;font-size:12px}
 @media print {
   .report-status { color: #111 !important; }
 }
+
+.rota-save-status{display:flex;align-items:center;gap:8px;white-space:nowrap}.rota-autosave{font-weight:700}.rota-autosave.pending{color:#475569}.rota-autosave.saving{color:#1d4ed8}.rota-autosave.saved{color:#166534}.rota-autosave.failed{color:#991b1b}
