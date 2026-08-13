@@ -162,3 +162,7 @@ code{word-break:break-all}
 button.small { padding:7px 10px; min-height:auto; }
 @media (max-width: 900px) { .vv-toolbar { align-items:stretch; flex-direction:column; } }
 @media print { .vv-toolbar .vv-controls, .vv-settings, .vv-table .no-print { display:none !important; } .vv-table-wrap { overflow:visible; } .vv-table { min-width:0; font-size:10px; } }
+
+
+/* Enterprise 3.5 Payroll PRO */
+.payroll-kpis{display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:12px;margin:12px 0}.payroll-kpi{display:flex;flex-direction:column;gap:5px}.payroll-kpi span{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}.payroll-kpi strong{font-size:20px}.payroll-table-wrap{overflow:auto;max-width:100%}.payroll-table{min-width:2200px;border-collapse:separate;border-spacing:0}.payroll-table thead th{position:sticky;top:0;z-index:4;background:#f8fafc}.payroll-table th,.payroll-table td{white-space:nowrap}.payroll-table .sticky-payroll-name{position:sticky;left:0;z-index:3;background:#fff;font-weight:700}.payroll-table thead th:first-child{position:sticky;left:0;z-index:6}.payroll-table tfoot td{font-weight:700;background:#f8fafc}@media(max-width:1000px){.payroll-kpis{grid-template-columns:repeat(2,minmax(140px,1fr))}}@media print{.payroll-kpis{display:none}.payroll-table{font-size:7px;min-width:0;width:100%}.payroll-table th,.payroll-table td{padding:2px 3px}.payroll-table .sticky-payroll-name,.payroll-table thead th:first-child{position:static}}

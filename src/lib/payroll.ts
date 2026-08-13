@@ -9,58 +9,56 @@ export interface PayrollSettings {
   evening_eur_per_hour: number;
   night_eur_per_hour: number;
   eve_eur_per_hour: number;
+  overtime_eur_per_hour: number;
   updated_at?: string;
 }
 
-export interface PayrollPeriod {
-  start: string;
-  end: string;
+export interface PayrollPeriod { start: string; end: string; }
+export interface RotaPeriodLite { id: string; start_date: string; end_date: string; }
+export interface PayrollAdjustment {
+  id: string; employee_id: string; restaurant_id: string; payroll_date: string;
+  amount: number; label: string; note: string; created_by: string | null; created_at: string;
 }
+export interface OvertimeSummary { contract_hours: number; worked_hours: number; overtime_hours: number; bank_delta: number; }
 
 export interface PayrollRow {
   employee: Employee;
   hours: TesBreakdown;
+  contract_hours: number;
+  overtime_hours: number;
+  bank_delta: number;
+  bank_balance: number;
   base_pay: number;
   evening_pay: number;
   night_pay: number;
   premium_100_pay: number;
   eve_pay: number;
+  overtime_pay: number;
+  adjustments_pay: number;
   gross_pay: number;
 }
 
 export const defaultPayrollSettings = (restaurantId: string): PayrollSettings => ({
-  restaurant_id: restaurantId,
-  period_start_day: 21,
-  evening_eur_per_hour: 0,
-  night_eur_per_hour: 0,
-  eve_eur_per_hour: 0,
+  restaurant_id: restaurantId, period_start_day: 21,
+  evening_eur_per_hour: 0, night_eur_per_hour: 0, eve_eur_per_hour: 0, overtime_eur_per_hour: 0,
 });
 
 export async function getPayrollSettings(restaurantId: string): Promise<PayrollSettings> {
   if (!supabase) return defaultPayrollSettings(restaurantId);
-  const { data, error } = await supabase
-    .from("payroll_settings")
-    .select("*")
-    .eq("restaurant_id", restaurantId)
-    .maybeSingle();
+  const { data, error } = await supabase.from("payroll_settings").select("*").eq("restaurant_id", restaurantId).maybeSingle();
   if (error) throw error;
-  return data ? (data as PayrollSettings) : defaultPayrollSettings(restaurantId);
+  return data ? { ...defaultPayrollSettings(restaurantId), ...(data as Partial<PayrollSettings>) } : defaultPayrollSettings(restaurantId);
 }
 
 export async function savePayrollSettings(settings: PayrollSettings): Promise<void> {
   if (!supabase) throw new Error("Supabase is not configured");
-  const { error } = await supabase.from("payroll_settings").upsert({
-    ...settings,
-    updated_at: new Date().toISOString(),
-  });
+  const { error } = await supabase.from("payroll_settings").upsert({ ...settings, updated_at: new Date().toISOString() });
   if (error) throw error;
 }
 
 export function payrollPeriodForDate(date: Date, startDay = 21): PayrollPeriod {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
-  let start: Date;
-  if (d.getDate() >= startDay) start = new Date(d.getFullYear(), d.getMonth(), startDay, 12);
-  else start = new Date(d.getFullYear(), d.getMonth() - 1, startDay, 12);
+  const start = d.getDate() >= startDay ? new Date(d.getFullYear(), d.getMonth(), startDay, 12) : new Date(d.getFullYear(), d.getMonth() - 1, startDay, 12);
   const nextStart = new Date(start.getFullYear(), start.getMonth() + 1, startDay, 12);
   return { start: isoDate(start), end: isoDate(addDays(nextStart, -1)) };
 }
@@ -72,27 +70,30 @@ export function movePayrollPeriod(period: PayrollPeriod, months: number, startDa
 
 export async function listPayrollShifts(restaurantId: string, start: string, end: string): Promise<RotaShift[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("rota_shifts")
-    .select("*")
-    .eq("restaurant_id", restaurantId)
-    .gte("shift_date", start)
-    .lte("shift_date", end)
-    .order("shift_date");
+  const { data, error } = await supabase.from("rota_shifts").select("*").eq("restaurant_id", restaurantId).gte("shift_date", start).lte("shift_date", end).order("shift_date");
   if (error) throw error;
   return (data || []) as RotaShift[];
 }
 
 export async function listPayrollSpecialDays(start: string, end: string): Promise<SpecialDay[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("tes_special_days")
-    .select("date,kind,label,premium_start,premium_end")
-    .gte("date", start)
-    .lte("date", end)
-    .order("date");
+  const { data, error } = await supabase.from("tes_special_days").select("date,kind,label,premium_start,premium_end").gte("date", start).lte("date", end).order("date");
   if (error) throw error;
   return (data || []) as SpecialDay[];
+}
+
+export async function listRotaPeriodsForRange(restaurantId: string, start: string, end: string): Promise<RotaPeriodLite[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("rota_periods").select("id,start_date,end_date").eq("restaurant_id", restaurantId).lte("start_date", end).gte("end_date", start).order("start_date");
+  if (error) throw error;
+  return (data || []) as RotaPeriodLite[];
+}
+
+export async function listPayrollAdjustments(restaurantId: string, start: string, end: string): Promise<PayrollAdjustment[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("payroll_adjustments").select("*").eq("restaurant_id", restaurantId).gte("payroll_date", start).lte("payroll_date", end).order("payroll_date");
+  if (error) throw error;
+  return (data || []) as PayrollAdjustment[];
 }
 
 export function aggregatePayrollHours(shifts: RotaShift[], specialDays: SpecialDay[]): Map<string, TesBreakdown> {
@@ -104,29 +105,65 @@ export function aggregatePayrollHours(shifts: RotaShift[], specialDays: SpecialD
   return out;
 }
 
-const money2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+export function calculateOvertimeByEmployee(
+  employees: Employee[], shifts: RotaShift[], periods: RotaPeriodLite[], specialDays: SpecialDay[]
+): Map<string, OvertimeSummary> {
+  const out = new Map<string, OvertimeSummary>();
+  const periodMap = new Map(periods.map(p => [p.id, p]));
+  const grouped = new Map<string, Map<string, number>>();
+  for (const shift of shifts) {
+    if (!periodMap.has(shift.period_id)) continue;
+    const worked = calculateShiftTes(shift, specialDays).worked_hours;
+    const byPeriod = grouped.get(shift.employee_id) || new Map<string, number>();
+    byPeriod.set(shift.period_id, (byPeriod.get(shift.period_id) || 0) + worked);
+    grouped.set(shift.employee_id, byPeriod);
+  }
+  for (const employee of employees) {
+    let contract = 0, worked = 0, overtime = 0, bank = 0;
+    const threshold = employee.contract_type === "0h" ? null : Number(employee.contract_hours || 112.5);
+    const byPeriod = grouped.get(employee.id) || new Map<string, number>();
+    for (const period of periods) {
+      const wh = byPeriod.get(period.id) || 0;
+      worked += wh;
+      if (threshold !== null) {
+        contract += threshold;
+        overtime += Math.max(0, wh - threshold);
+        bank += wh - threshold;
+      }
+    }
+    out.set(employee.id, {
+      contract_hours: round2(contract), worked_hours: round2(worked),
+      overtime_hours: round2(overtime), bank_delta: round2(bank),
+    });
+  }
+  return out;
+}
 
-export function calculatePayrollRow(employee: Employee, hours: TesBreakdown, settings: PayrollSettings): PayrollRow {
+const money2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+export function calculatePayrollRow(
+  employee: Employee, hours: TesBreakdown, settings: PayrollSettings,
+  overtime: OvertimeSummary = { contract_hours: 0, worked_hours: 0, overtime_hours: 0, bank_delta: 0 },
+  adjustmentsPay = 0
+): PayrollRow {
   const hourlyRate = Number(employee.hourly_rate || 0);
-  // Monthly employees receive their configured monthly salary as base. Hourly employees
-  // receive all paid base hours (worked + S + VL) at their hourly rate.
-  const basePay = employee.contract_type === "monthly"
-    ? Number(employee.monthly_salary || 0)
-    : hours.base_hours * hourlyRate;
+  const basePay = employee.contract_type === "monthly" ? Number(employee.monthly_salary || 0) : hours.base_hours * hourlyRate;
   const eveningPay = hours.evening_hours * Number(settings.evening_eur_per_hour || 0);
   const nightPay = hours.night_hours * Number(settings.night_eur_per_hour || 0);
-  // Sunday and holiday are a 100% premium. premium_100_hours is a union, so a minute
-  // that is both Sunday and holiday is not paid twice here.
   const premium100Pay = hours.premium_100_hours * hourlyRate;
   const evePay = hours.eve_hours * Number(settings.eve_eur_per_hour || 0);
+  // Base pay already contains every worked hour. This is only an EXTRA overtime supplement.
+  const overtimePay = overtime.overtime_hours * Number(settings.overtime_eur_per_hour || 0);
+  const gross = basePay + eveningPay + nightPay + premium100Pay + evePay + overtimePay + adjustmentsPay;
   return {
-    employee,
-    hours,
-    base_pay: money2(basePay),
-    evening_pay: money2(eveningPay),
-    night_pay: money2(nightPay),
-    premium_100_pay: money2(premium100Pay),
-    eve_pay: money2(evePay),
-    gross_pay: money2(basePay + eveningPay + nightPay + premium100Pay + evePay),
+    employee, hours,
+    contract_hours: overtime.contract_hours,
+    overtime_hours: overtime.overtime_hours,
+    bank_delta: overtime.bank_delta,
+    bank_balance: round2(Number(employee.bank_hours || 0) + overtime.bank_delta),
+    base_pay: money2(basePay), evening_pay: money2(eveningPay), night_pay: money2(nightPay),
+    premium_100_pay: money2(premium100Pay), eve_pay: money2(evePay), overtime_pay: money2(overtimePay),
+    adjustments_pay: money2(adjustmentsPay), gross_pay: money2(gross),
   };
 }

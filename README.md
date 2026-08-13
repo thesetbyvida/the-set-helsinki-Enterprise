@@ -44,3 +44,7 @@ Set the Supabase environment variables expected by `src/lib/supabase.ts`, connec
 ## Important
 
 Do not upload Vercel's compiled `Resources` files over the source project. Deploy this source repository so Vite compiles it normally.
+
+
+## 3.5 Payroll PRO
+Run `supabase/migrations/011_payroll_pro.sql` after the 3.4 migration. Payroll now includes selectable 21–20 periods, overtime/hour-bank visibility and configurable overtime extra €/h.
