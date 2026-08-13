@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext";
 
 type Check = { label: string; ok: boolean; detail: string };
 
-export function ProductionPage() {
+export function ProductionPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { profile } = useApp();
   const [checks, setChecks] = useState<Check[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,8 +43,8 @@ export function ProductionPage() {
     <div className="page-stack">
       <div className="page-header">
         <div>
-          <h1>Production status</h1>
-          <p className="muted">Final readiness checks for The Set Helsinki Enterprise 4.9.</p>
+          <h1>{embedded ? "System status" : "Production status"}</h1>
+          <p className="muted">Production readiness checks for The Set Helsinki Enterprise 5.1.</p>
         </div>
         <button className="secondary" onClick={() => void runChecks()}>Run checks</button>
       </div>

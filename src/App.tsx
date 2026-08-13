@@ -14,9 +14,9 @@ import { VvPage } from "./pages/VvPage";
 import EmployeePortalPage from "./pages/EmployeePortalPage";
 import VacationsPage from "./pages/VacationsPage";
 import { ReportsPage } from "./pages/ReportsPage";
-import { ProductionPage } from "./pages/ProductionPage";
 import { PosPage } from "./pages/PosPage";
 import { AuditPage } from "./pages/AuditPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export default function App() {
   const {
@@ -93,10 +93,10 @@ export default function App() {
         if (page === "vv") return <VvPage />;
         if (page === "reports") return <ReportsPage />;
         if (page === "pos") return <PosPage />;
-        if (page === "production") return <ProductionPage />;
         if (page === "audit") return <AuditPage />;
         if (page === "mywork") return <EmployeePortalPage />;
         if (page === "requests") return <VacationsPage />;
+        if (page === "settings") return <SettingsPage />;
 
         const descriptions: Record<string, string> = {
           settings: "Phase 13",

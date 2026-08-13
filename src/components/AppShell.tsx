@@ -38,7 +38,6 @@ export function AppShell({ children }: AppShellProps) {
     ["vv", t.vv],
     ["reports", t.reports],
     ["pos", t.pos || "POS / Sales"],
-    ["production", t.production || "Production"],
     ["audit", "Security / Audit"],
     ["mywork", t.myWork || "My work"],
     ["requests", t.requests || "Requests"],
