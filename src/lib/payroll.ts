@@ -8,7 +8,9 @@ export interface PayrollSettings {
   period_start_day: number;
   evening_eur_per_hour: number;
   night_eur_per_hour: number;
+  // Kept for DB backwards compatibility. Phase 4.4 calculates aatto from TES percentages.
   eve_eur_per_hour: number;
+  // Kept for DB backwards compatibility. Phase 4.4 calculates overtime as 50%/100% of base hourly rate.
   overtime_eur_per_hour: number;
   updated_at?: string;
 }
@@ -19,12 +21,23 @@ export interface PayrollAdjustment {
   id: string; employee_id: string; restaurant_id: string; payroll_date: string;
   amount: number; label: string; note: string; created_by: string | null; created_at: string;
 }
-export interface OvertimeSummary { contract_hours: number; worked_hours: number; overtime_hours: number; bank_delta: number; }
+export interface OvertimeSummary {
+  contract_hours: number;
+  worked_hours: number;
+  additional_work_hours: number;
+  overtime_50_hours: number;
+  overtime_100_hours: number;
+  overtime_hours: number;
+  bank_delta: number;
+}
 
 export interface PayrollRow {
   employee: Employee;
   hours: TesBreakdown;
   contract_hours: number;
+  additional_work_hours: number;
+  overtime_50_hours: number;
+  overtime_100_hours: number;
   overtime_hours: number;
   bank_delta: number;
   bank_balance: number;
@@ -32,8 +45,11 @@ export interface PayrollRow {
   reference_hourly_rate: number;
   monthly_salary: number;
   base_pay: number;
+  extra_work_base_pay: number;
   evening_pay: number;
   night_pay: number;
+  premium_100_base_pay: number;
+  premium_100_supplement_pay: number;
   premium_100_pay: number;
   eve_pay: number;
   overtime_pay: number;
@@ -42,8 +58,13 @@ export interface PayrollRow {
 }
 
 export const defaultPayrollSettings = (restaurantId: string): PayrollSettings => ({
-  restaurant_id: restaurantId, period_start_day: 21,
-  evening_eur_per_hour: 0, night_eur_per_hour: 0, eve_eur_per_hour: 0, overtime_eur_per_hour: 0,
+  restaurant_id: restaurantId,
+  period_start_day: 21,
+  // Current MaRa/PAM employee TES rates effective in 2026. Still editable per restaurant.
+  evening_eur_per_hour: 1.40,
+  night_eur_per_hour: 2.37,
+  eve_eur_per_hour: 0,
+  overtime_eur_per_hour: 0,
 });
 
 export async function getPayrollSettings(restaurantId: string): Promise<PayrollSettings> {
@@ -108,12 +129,21 @@ export function aggregatePayrollHours(shifts: RotaShift[], specialDays: SpecialD
   return out;
 }
 
+/**
+ * MaRa/PAM 3-week work-time model used in Phase 4.4:
+ * - regular maximum: 112.5 h / 3 weeks
+ * - additional work: above the employee's agreed hours up to 120 h
+ * - overtime: above 120 h; first 18 h +50%, following hours +100%
+ *
+ * Bank delta remains measured against the employee's agreed contract hours.
+ */
 export function calculateOvertimeByEmployee(
   employees: Employee[], shifts: RotaShift[], periods: RotaPeriodLite[], specialDays: SpecialDay[]
 ): Map<string, OvertimeSummary> {
   const out = new Map<string, OvertimeSummary>();
   const periodMap = new Map(periods.map(p => [p.id, p]));
   const grouped = new Map<string, Map<string, number>>();
+
   for (const shift of shifts) {
     if (!periodMap.has(shift.period_id)) continue;
     const worked = calculateShiftTes(shift, specialDays).worked_hours;
@@ -121,22 +151,39 @@ export function calculateOvertimeByEmployee(
     byPeriod.set(shift.period_id, (byPeriod.get(shift.period_id) || 0) + worked);
     grouped.set(shift.employee_id, byPeriod);
   }
+
   for (const employee of employees) {
-    let contract = 0, worked = 0, overtime = 0, bank = 0;
-    const threshold = employee.contract_type === "0h" ? null : Number(employee.contract_hours || 112.5);
+    let contract = 0;
+    let worked = 0;
+    let additional = 0;
+    let overtime50 = 0;
+    let overtime100 = 0;
+    let bank = 0;
+    const contractHours = employee.contract_type === "0h" ? 0 : Number(employee.contract_hours || 112.5);
     const byPeriod = grouped.get(employee.id) || new Map<string, number>();
+
     for (const period of periods) {
       const wh = byPeriod.get(period.id) || 0;
       worked += wh;
-      if (threshold !== null) {
-        contract += threshold;
-        overtime += Math.max(0, wh - threshold);
-        bank += wh - threshold;
-      }
+      contract += contractHours;
+      bank += wh - contractHours;
+
+      const additionalStart = Math.min(Math.max(contractHours, 0), 120);
+      additional += Math.max(0, Math.min(wh, 120) - additionalStart);
+
+      const ot = Math.max(0, wh - 120);
+      overtime50 += Math.min(18, ot);
+      overtime100 += Math.max(0, ot - 18);
     }
+
     out.set(employee.id, {
-      contract_hours: round2(contract), worked_hours: round2(worked),
-      overtime_hours: round2(overtime), bank_delta: round2(bank),
+      contract_hours: round2(contract),
+      worked_hours: round2(worked),
+      additional_work_hours: round2(additional),
+      overtime_50_hours: round2(overtime50),
+      overtime_100_hours: round2(overtime100),
+      overtime_hours: round2(overtime50 + overtime100),
+      bank_delta: round2(bank),
     });
   }
   return out;
@@ -147,44 +194,85 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 
 export function calculatePayrollRow(
   employee: Employee, hours: TesBreakdown, settings: PayrollSettings,
-  overtime: OvertimeSummary = { contract_hours: 0, worked_hours: 0, overtime_hours: 0, bank_delta: 0 },
+  overtime: OvertimeSummary = {
+    contract_hours: 0,
+    worked_hours: 0,
+    additional_work_hours: 0,
+    overtime_50_hours: 0,
+    overtime_100_hours: 0,
+    overtime_hours: 0,
+    bank_delta: 0,
+  },
   adjustmentsPay = 0
 ): PayrollRow {
   const hourlyRate = Number(employee.hourly_rate || 0);
   const monthlySalary = Number(employee.monthly_salary || 0);
   const isMonthly = employee.contract_type === "monthly" || monthlySalary > 0;
 
-  // Monthly employees receive the configured fixed monthly salary for a full payroll period.
-  // For percentage-based supplements (Sunday/holiday 100%), prefer an explicitly configured
-  // hourly rate. If none is stored, derive a reference rate from the employee's contracted
-  // 3-week hours (e.g. 112.5 h / 3 weeks -> 162.5 h/month).
-  const contractHours3w = Number(employee.contract_hours || 0);
-  const monthlyEquivalentHours = contractHours3w > 0 ? contractHours3w * 52 / 36 : 0;
+  // TES 13 §: part-time hourly rate = monthly salary / 159.
   const referenceHourlyRate = hourlyRate > 0
     ? hourlyRate
-    : (isMonthly && monthlySalary > 0 && monthlyEquivalentHours > 0
-      ? monthlySalary / monthlyEquivalentHours
-      : 0);
+    : (isMonthly && monthlySalary > 0 ? monthlySalary / 159 : 0);
 
+  // Hourly workers are paid for all base hours directly. Monthly workers receive the fixed
+  // monthly salary; hours beyond the regular salary scope are added separately below.
   const basePay = isMonthly ? monthlySalary : hours.base_hours * hourlyRate;
-  const eveningPay = hours.evening_hours * Number(settings.evening_eur_per_hour || 0);
-  const nightPay = hours.night_hours * Number(settings.night_eur_per_hour || 0);
-  const premium100Pay = hours.premium_100_hours * referenceHourlyRate;
-  const evePay = hours.eve_hours * Number(settings.eve_eur_per_hour || 0);
-  // Base pay already contains every worked hour. This is only an EXTRA overtime supplement.
-  const overtimePay = overtime.overtime_hours * Number(settings.overtime_eur_per_hour || 0);
-  const gross = basePay + eveningPay + nightPay + premium100Pay + evePay + overtimePay + adjustmentsPay;
+
+  const extraWorkBasePay = isMonthly
+    ? (overtime.additional_work_hours + overtime.overtime_hours) * referenceHourlyRate
+    : 0;
+
+  const eveningRate = Number(settings.evening_eur_per_hour || 0);
+  const nightRate = Number(settings.night_eur_per_hour || 0);
+  const eveningPay = hours.evening_hours * eveningRate;
+  const nightPay = hours.night_hours * nightRate;
+
+  // Sunday/holiday: base wage AND evening/night supplements are increased by 100%.
+  const premium100BasePay = hours.premium_100_hours * referenceHourlyRate;
+  const premium100SupplementPay =
+    hours.premium_100_evening_hours * eveningRate +
+    hours.premium_100_night_hours * nightRate;
+  const premium100Pay = premium100BasePay + premium100SupplementPay;
+
+  // Aatto after 15:00: +50% base wage, and +50% evening supplement for the evening overlap.
+  const evePay =
+    hours.eve_hours * referenceHourlyRate * 0.5 +
+    hours.eve_evening_hours * eveningRate * 0.5;
+
+  // Overtime: first 18 h above 120 h +50%, later hours +100%.
+  // For hourly employees the basic wage for those hours is already in basePay.
+  // For monthly employees the basic wage is included in extraWorkBasePay.
+  const overtimePay =
+    overtime.overtime_50_hours * referenceHourlyRate * 0.5 +
+    overtime.overtime_100_hours * referenceHourlyRate;
+
+  const gross =
+    basePay + extraWorkBasePay + eveningPay + nightPay + premium100Pay +
+    evePay + overtimePay + adjustmentsPay;
+
   return {
-    employee, hours,
+    employee,
+    hours,
     contract_hours: overtime.contract_hours,
+    additional_work_hours: overtime.additional_work_hours,
+    overtime_50_hours: overtime.overtime_50_hours,
+    overtime_100_hours: overtime.overtime_100_hours,
     overtime_hours: overtime.overtime_hours,
     bank_delta: overtime.bank_delta,
     bank_balance: round2(Number(employee.bank_hours || 0) + overtime.bank_delta),
     pay_basis: isMonthly ? "monthly" : "hourly",
     reference_hourly_rate: money2(referenceHourlyRate),
     monthly_salary: money2(monthlySalary),
-    base_pay: money2(basePay), evening_pay: money2(eveningPay), night_pay: money2(nightPay),
-    premium_100_pay: money2(premium100Pay), eve_pay: money2(evePay), overtime_pay: money2(overtimePay),
-    adjustments_pay: money2(adjustmentsPay), gross_pay: money2(gross),
+    base_pay: money2(basePay),
+    extra_work_base_pay: money2(extraWorkBasePay),
+    evening_pay: money2(eveningPay),
+    night_pay: money2(nightPay),
+    premium_100_base_pay: money2(premium100BasePay),
+    premium_100_supplement_pay: money2(premium100SupplementPay),
+    premium_100_pay: money2(premium100Pay),
+    eve_pay: money2(evePay),
+    overtime_pay: money2(overtimePay),
+    adjustments_pay: money2(adjustmentsPay),
+    gross_pay: money2(gross),
   };
 }

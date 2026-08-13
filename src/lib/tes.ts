@@ -19,7 +19,10 @@ export interface TesBreakdown {
   sunday_hours: number;
   holiday_hours: number;
   premium_100_hours: number;
+  premium_100_evening_hours: number;
+  premium_100_night_hours: number;
   eve_hours: number;
+  eve_evening_hours: number;
   sick_hours: number;
   vacation_hours: number;
   vv_days: number;
@@ -34,7 +37,10 @@ const ZERO: TesBreakdown = {
   sunday_hours: 0,
   holiday_hours: 0,
   premium_100_hours: 0,
+  premium_100_evening_hours: 0,
+  premium_100_night_hours: 0,
   eve_hours: 0,
+  eve_evening_hours: 0,
   sick_hours: 0,
   vacation_hours: 0,
   vv_days: 0,
@@ -58,16 +64,19 @@ function inClockRange(minuteOfDay: number, start: number, end: number) {
 }
 
 /**
- * Splits a shift minute-by-minute so midnight, Sunday, holiday and time-band
- * boundaries are deterministic. The returned values are hours rounded to 2 decimals.
+ * Splits a shift minute-by-minute so midnight, Sunday, holiday, aatto and
+ * evening/night boundaries remain deterministic.
  *
- * House rules used by The Set Helsinki:
+ * The Set Helsinki house rules retained from the existing application:
  * - Evening: 18:00–24:00
  * - Night: 00:00–06:00
- * - Saturday -> Sunday: only minutes after 00:00 are Sunday.
+ * - Saturday -> Sunday: minutes after 00:00 become Sunday.
  * - Sunday -> Monday: Sunday premium follows the whole overnight shift.
- * - S and VL are 7.5 paid base hours; VV/V/VP do not create worked hours.
- * - Holiday and eve periods are data-driven through tes_special_days.
+ * - S and VL create 7.5 paid base hours; VV/V/VP do not create worked hours.
+ *
+ * Phase 4.4 also records overlap hours so payroll can correctly double the
+ * evening/night supplements on Sunday/holiday work and calculate aatto as a
+ * percentage rather than a fixed euro amount.
  */
 export function calculateShiftTes(
   shift: Pick<RotaShift, "shift_date" | "start_time" | "end_time" | "code">,
@@ -106,6 +115,7 @@ export function calculateShiftTes(
   const startIsSunday = startDate.getDay() === 0;
   const holidayMinutes = new Set<number>();
   const sundayMinutes = new Set<number>();
+  const premium100Minutes = new Set<number>();
 
   for (let offset = 0; offset < totalMinutes; offset += 1) {
     const absolute = startMinute + offset;
@@ -113,20 +123,39 @@ export function calculateShiftTes(
     const minuteOfDay = absolute % 1440;
     const currentDate = addDays(startDate, dayOffset);
     const currentIso = isoDate(currentDate);
+    const isEvening = minuteOfDay >= 18 * 60;
+    const isNight = minuteOfDay < 6 * 60;
 
-    if (minuteOfDay >= 18 * 60) result.evening_hours += 1 / 60;
-    if (minuteOfDay < 6 * 60) result.night_hours += 1 / 60;
+    if (isEvening) result.evening_hours += 1 / 60;
+    if (isNight) result.night_hours += 1 / 60;
 
     const sunday = startIsSunday || currentDate.getDay() === 0;
     if (sunday) sundayMinutes.add(offset);
 
     const dayRules = specialDays.filter((item) => item.date === currentIso);
+    let holiday = false;
+    let eve = false;
+
     for (const rule of dayRules) {
       const rangeStart = minutes(rule.premium_start || "00:00");
       const rangeEnd = minutes(rule.premium_end || "00:00");
       if (!inClockRange(minuteOfDay, rangeStart, rangeEnd)) continue;
-      if (rule.kind === "holiday") holidayMinutes.add(offset);
-      if (rule.kind === "eve") result.eve_hours += 1 / 60;
+      if (rule.kind === "holiday") holiday = true;
+      if (rule.kind === "eve") eve = true;
+    }
+
+    if (holiday) holidayMinutes.add(offset);
+
+    // TES: aatto premium is not paid when the eve itself falls on a holiday.
+    if (eve && !holiday) {
+      result.eve_hours += 1 / 60;
+      if (isEvening) result.eve_evening_hours += 1 / 60;
+    }
+
+    if (sunday || holiday) {
+      premium100Minutes.add(offset);
+      if (isEvening) result.premium_100_evening_hours += 1 / 60;
+      if (isNight) result.premium_100_night_hours += 1 / 60;
     }
   }
 
@@ -134,7 +163,7 @@ export function calculateShiftTes(
   result.base_hours = result.worked_hours;
   result.sunday_hours = sundayMinutes.size / 60;
   result.holiday_hours = holidayMinutes.size / 60;
-  result.premium_100_hours = new Set([...sundayMinutes, ...holidayMinutes]).size / 60;
+  result.premium_100_hours = premium100Minutes.size / 60;
 
   for (const key of [
     "base_hours",
@@ -144,7 +173,10 @@ export function calculateShiftTes(
     "sunday_hours",
     "holiday_hours",
     "premium_100_hours",
+    "premium_100_evening_hours",
+    "premium_100_night_hours",
     "eve_hours",
+    "eve_evening_hours",
     "sick_hours",
     "vacation_hours",
   ] as const) {

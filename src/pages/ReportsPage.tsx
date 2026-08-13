@@ -133,11 +133,30 @@ export function ReportsPage() {
       ]);
 
       const byEmployee = aggregatePayrollHours(shifts, specialDays);
+      const completedPeriods = rotaPeriods.filter(
+        p => p.end_date >= period.start && p.end_date <= period.end
+      );
+      let overtimeShifts = shifts;
+      let overtimeSpecialDays = specialDays;
+      if (completedPeriods.length) {
+        const overtimeStart = completedPeriods.reduce(
+          (m, p) => (p.start_date < m ? p.start_date : m),
+          completedPeriods[0].start_date
+        );
+        const overtimeEnd = completedPeriods.reduce(
+          (m, p) => (p.end_date > m ? p.end_date : m),
+          completedPeriods[0].end_date
+        );
+        [overtimeShifts, overtimeSpecialDays] = await Promise.all([
+          listPayrollShifts(restaurantId, overtimeStart, overtimeEnd),
+          listPayrollSpecialDays(overtimeStart, overtimeEnd),
+        ]);
+      }
       const overtime = calculateOvertimeByEmployee(
         visibleEmployees,
-        shifts,
-        rotaPeriods,
-        specialDays
+        overtimeShifts,
+        completedPeriods,
+        overtimeSpecialDays
       );
 
       const adjustmentMap = new Map<string, number>();
