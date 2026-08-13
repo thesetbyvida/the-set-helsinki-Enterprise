@@ -210,9 +210,13 @@ export function calculatePayrollRow(
   const isMonthly = employee.contract_type === "monthly" || monthlySalary > 0;
 
   // TES 13 §: part-time hourly rate = monthly salary / 159.
-  const referenceHourlyRate = hourlyRate > 0
-    ? hourlyRate
-    : (isMonthly && monthlySalary > 0 ? monthlySalary / 159 : 0);
+  // Phase 5.2 validation: for a monthly-paid employee the TES reference hourly
+  // rate must come from the monthly salary, even if an old hourly_rate value is
+  // still stored on the employee record. This prevents stale hourly data from
+  // changing Sunday/overtime/Aatto calculations for monthly employees.
+  const referenceHourlyRate = isMonthly
+    ? (monthlySalary > 0 ? monthlySalary / 159 : 0)
+    : hourlyRate;
 
   // Hourly workers are paid for all base hours directly. Monthly workers receive the fixed
   // monthly salary; hours beyond the regular salary scope are added separately below.
