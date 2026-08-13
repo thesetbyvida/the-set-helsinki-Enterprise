@@ -141,3 +141,24 @@ code{word-break:break-all}
 .employee-order-controls .drag-handle{font-weight:800;color:#111827}
 .employee-order-controls button{background:#fff!important;color:#111827!important;border:1px solid #b9c3d0!important;font-weight:800}
 .employee-order-controls button:hover:not(:disabled){background:#e5e7eb!important}
+
+/* Enterprise 3.4 — VV / Vuosivapaa */
+.vv-page { display: grid; gap: 14px; }
+.vv-toolbar { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; }
+.vv-toolbar h2 { margin:0 0 6px; }
+.vv-controls { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+.vv-controls label, .vv-settings label { display:grid; gap:5px; font-size:12px; color:#64748b; }
+.vv-controls select, .vv-settings input { min-height:40px; }
+.vv-settings { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+.vv-settings input { width:150px; }
+.vv-summary-note { font-size:14px; }
+.vv-table-wrap { overflow:auto; padding:0; }
+.vv-table { width:100%; border-collapse:collapse; min-width:950px; }
+.vv-table th, .vv-table td { border-bottom:1px solid #e5e7eb; padding:11px 12px; text-align:right; white-space:nowrap; }
+.vv-table th:first-child, .vv-table td:first-child { text-align:left; position:sticky; left:0; background:#fff; z-index:2; }
+.vv-table thead th { background:#f8fafc; font-size:12px; color:#475569; }
+.vv-table tbody tr:hover td { background:#f8fafc; }
+.vv-table tbody tr:hover td:first-child { background:#f8fafc; }
+button.small { padding:7px 10px; min-height:auto; }
+@media (max-width: 900px) { .vv-toolbar { align-items:stretch; flex-direction:column; } }
+@media print { .vv-toolbar .vv-controls, .vv-settings, .vv-table .no-print { display:none !important; } .vv-table-wrap { overflow:visible; } .vv-table { min-width:0; font-size:10px; } }

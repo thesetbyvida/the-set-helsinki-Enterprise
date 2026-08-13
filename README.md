@@ -1,3 +1,5 @@
+> Current build: Enterprise 3.4 — VV / Hour Bank / Overtime Base
+
 # The Set Helsinki Enterprise 3.0
 
 Consolidated base for the restaurant rota, HourCalc, Users and Payroll application.
