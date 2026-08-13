@@ -166,3 +166,19 @@ button.small { padding:7px 10px; min-height:auto; }
 
 /* Enterprise 3.5 Payroll PRO */
 .payroll-kpis{display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:12px;margin:12px 0}.payroll-kpi{display:flex;flex-direction:column;gap:5px}.payroll-kpi span{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}.payroll-kpi strong{font-size:20px}.payroll-table-wrap{overflow:auto;max-width:100%}.payroll-table{min-width:2200px;border-collapse:separate;border-spacing:0}.payroll-table thead th{position:sticky;top:0;z-index:4;background:#f8fafc}.payroll-table th,.payroll-table td{white-space:nowrap}.payroll-table .sticky-payroll-name{position:sticky;left:0;z-index:3;background:#fff;font-weight:700}.payroll-table thead th:first-child{position:sticky;left:0;z-index:6}.payroll-table tfoot td{font-weight:700;background:#f8fafc}@media(max-width:1000px){.payroll-kpis{grid-template-columns:repeat(2,minmax(140px,1fr))}}@media print{.payroll-kpis{display:none}.payroll-table{font-size:7px;min-width:0;width:100%}.payroll-table th,.payroll-table td{padding:2px 3px}.payroll-table .sticky-payroll-name,.payroll-table thead th:first-child{position:static}}
+
+
+/* Enterprise 3.6 Employee App */
+.employee-actions-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:14px;
+}
+.employee-action-card{
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  padding:16px;
+  background:#fff;
+}
+.employee-action-card h3{margin:0 0 6px}
+.employee-action-card p{margin:0;color:#64748b}

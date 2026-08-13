@@ -11,6 +11,7 @@ import { RotaPage } from "./pages/RotaPage";
 import { HourCalcPage } from "./pages/HourCalcPage";
 import { PayrollPage } from "./pages/PayrollPage";
 import { VvPage } from "./pages/VvPage";
+import EmployeePortalPage from "./pages/EmployeePortalPage";
 
 export default function App() {
   const {
