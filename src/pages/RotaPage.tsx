@@ -414,6 +414,7 @@ export function RotaPage() {
           <span>{qaIssues.length
             ? (language === "fi" ? `${qaIssues.length} ongelmaa estää tallennuksen.` : language === "es" ? `${qaIssues.length} problema${qaIssues.length === 1 ? "" : "s"} impide${qaIssues.length === 1 ? "" : "n"} guardar.` : `${qaIssues.length} issue${qaIssues.length === 1 ? "" : "s"} block saving.`)
             : (language === "fi" ? "Vuorot läpäisevät perustarkistukset." : language === "es" ? "Los turnos pasan las comprobaciones básicas." : "Shifts pass the basic checks.")}
+          </span>
         </div>
         {dirty.size > 0 && <span className="rota-unsaved">{language === "fi" ? `${dirty.size} tallentamatta` : language === "es" ? `${dirty.size} sin guardar` : `${dirty.size} unsaved`}</span>}
       </div>
