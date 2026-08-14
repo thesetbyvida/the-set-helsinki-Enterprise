@@ -1,23 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../context/AppContext";
 import { LanguageSelector } from "./LanguageSelector";
-
-type PageId =
-  | "dashboard"
-  | "restaurants"
-  | "employees"
-  | "users"
-  | "rota"
-  | "hourcalc"
-  | "payroll"
-  | "vv"
-  | "reports"
-  | "pos"
-  | "production"
-  | "audit"
-  | "mywork"
-  | "requests"
-  | "settings";
+import { canOpenPage, defaultPageForRole, type PageId } from "../lib/access";
 
 interface AppShellProps {
   children: (page: PageId) => ReactNode;
@@ -25,7 +9,11 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { profile, logout, t } = useApp();
-  const [page, setPage] = useState<PageId>(() => profile?.role === "employee" ? "mywork" : "dashboard");
+  const [page, setPage] = useState<PageId>(() => defaultPageForRole(profile?.role));
+
+  useEffect(() => {
+    if (!canOpenPage(profile?.role, page)) setPage(defaultPageForRole(profile?.role));
+  }, [profile?.role, page]);
 
   const allPages: Array<[PageId, string]> = [
     ["dashboard", t.dashboard],
@@ -44,13 +32,7 @@ export function AppShell({ children }: AppShellProps) {
     ["settings", t.settings],
   ];
 
-  const visiblePages = allPages.filter(([id]) => {
-    if (profile?.role === "employee") return ["rota", "mywork", "requests"].includes(id);
-    if (profile?.role === "manager") return !["users", "payroll", "reports", "production", "audit", "settings"].includes(id);
-    if (id === "users") return profile?.role === "super_admin";
-    if (id === "audit") return profile?.role === "super_admin" || profile?.role === "admin";
-    return true;
-  });
+  const visiblePages = allPages.filter(([id]) => canOpenPage(profile?.role, id));
 
   return (
     <div className="app-shell">

@@ -18,6 +18,7 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { PosPage } from "./pages/PosPage";
 import { AuditPage } from "./pages/AuditPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { canOpenPage, defaultPageForRole } from "./lib/access";
 
 export default function App() {
   const {
@@ -88,6 +89,11 @@ export default function App() {
   return (
     <AppShell>
       {(page) => {
+        if (!canOpenPage(profile.role, page)) {
+          const safePage = defaultPageForRole(profile.role);
+          if (safePage === "mywork") return <EmployeePortalPage />;
+          return <DashboardPage />;
+        }
         if (page === "dashboard") return <DashboardPage />;
         if (page === "restaurants") return <RestaurantsPage />;
         if (page === "employees") return <EmployeesPage />;

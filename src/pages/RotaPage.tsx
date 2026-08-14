@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { listRestaurants } from "../lib/restaurants";
+import { listRestaurants, listRotaRestaurants } from "../lib/restaurants";
 import { listEmployeeRestaurants, listEmployees, listRotaDirectory, saveRestaurantEmployeeOrder } from "../lib/employees";
 import { formatError } from "../lib/errors";
 import {
@@ -108,7 +108,7 @@ export function RotaPage() {
     (async () => {
       try {
         setLoading(true);
-        const restaurantData = await listRestaurants();
+        const restaurantData = profile?.role === "employee" ? await listRotaRestaurants() : await listRestaurants();
         const directory = profile?.role === "employee" ? await listRotaDirectory() : null;
         const [employeeData, assignmentData] = directory
           ? [directory.employees, directory.assignments]
@@ -124,7 +124,7 @@ export function RotaPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [profile?.role]);
 
   const dates = useMemo(() => {
     const first = parseIsoDate(startDate);
