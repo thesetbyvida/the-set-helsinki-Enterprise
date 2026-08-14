@@ -26,7 +26,7 @@ interface AppContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<boolean>;
   reloadProfile: () => Promise<void>;
 }
 
@@ -134,13 +134,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function updatePassword(password: string) {
-    if (!supabase) return;
+    if (!supabase) return false;
     setError("");
     setMessage("");
 
     const { error: updateError } = await supabase.auth.updateUser({ password });
-    if (updateError) setError(updateError.message);
-    else setMessage(t.passwordUpdated);
+    if (updateError) { setError(updateError.message); return false; }
+    setMessage(t.passwordUpdated);
+    return true;
   }
 
   const value = useMemo<AppContextValue>(

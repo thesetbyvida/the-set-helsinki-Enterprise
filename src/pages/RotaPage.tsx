@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { listRestaurants } from "../lib/restaurants";
-import { listEmployeeRestaurants, listEmployees, saveRestaurantEmployeeOrder } from "../lib/employees";
+import { listEmployeeRestaurants, listEmployees, listRotaDirectory, saveRestaurantEmployeeOrder } from "../lib/employees";
 import { formatError } from "../lib/errors";
 import {
   addDays,
@@ -108,11 +108,11 @@ export function RotaPage() {
     (async () => {
       try {
         setLoading(true);
-        const [restaurantData, employeeData, assignmentData] = await Promise.all([
-          listRestaurants(),
-          listEmployees(),
-          listEmployeeRestaurants(),
-        ]);
+        const restaurantData = await listRestaurants();
+        const directory = profile?.role === "employee" ? await listRotaDirectory() : null;
+        const [employeeData, assignmentData] = directory
+          ? [directory.employees, directory.assignments]
+          : await Promise.all([listEmployees(), listEmployeeRestaurants()]);
         const activeRestaurants = restaurantData.filter((r) => r.active);
         setRestaurants(activeRestaurants);
         setEmployees(employeeData.filter((e) => e.active));

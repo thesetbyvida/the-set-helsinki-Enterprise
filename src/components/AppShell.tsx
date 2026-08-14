@@ -25,7 +25,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { profile, logout, t } = useApp();
-  const [page, setPage] = useState<PageId>("dashboard");
+  const [page, setPage] = useState<PageId>(() => profile?.role === "employee" ? "mywork" : "dashboard");
 
   const allPages: Array<[PageId, string]> = [
     ["dashboard", t.dashboard],
@@ -45,7 +45,7 @@ export function AppShell({ children }: AppShellProps) {
   ];
 
   const visiblePages = allPages.filter(([id]) => {
-    if (profile?.role === "employee") return ["dashboard", "rota", "vv", "mywork", "requests"].includes(id);
+    if (profile?.role === "employee") return ["rota", "mywork", "requests"].includes(id);
     if (profile?.role === "manager") return !["users", "payroll", "reports", "production", "audit", "settings"].includes(id);
     if (id === "audit") return profile?.role === "super_admin" || profile?.role === "admin";
     return true;

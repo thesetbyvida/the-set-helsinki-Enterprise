@@ -2,6 +2,7 @@ import { useApp } from "./context/AppContext";
 import { AppShell } from "./components/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { SetPasswordPage } from "./pages/SetPasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { RestaurantsPage } from "./pages/RestaurantsPage";
@@ -39,6 +40,10 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  if (window.location.pathname.includes("set-password")) {
+    return <SetPasswordPage />;
   }
 
   if (window.location.pathname.includes("reset-password")) {

@@ -136,3 +136,36 @@ export async function saveRestaurantEmployeeOrder(restaurantId: string, employee
   });
   if (error) throw error;
 }
+
+export async function listRotaDirectory(): Promise<{ employees: Employee[]; assignments: EmployeeRestaurant[] }> {
+  if (!supabase) return { employees: [], assignments: [] };
+  const { data, error } = await supabase.rpc("rota_employee_directory");
+  if (error) throw error;
+  const rows = (data || []) as Array<{ id:string; name:string; job_title:string|null; active:boolean; restaurant_id:string; display_order:number }>;
+  const byId = new Map<string, Employee>();
+  const assignments: EmployeeRestaurant[] = [];
+  for (const row of rows) {
+    if (!byId.has(row.id)) {
+      byId.set(row.id, {
+        id: row.id,
+        employee_number: null,
+        name: row.name,
+        email: null,
+        phone: null,
+        address: null,
+        birth_date: null,
+        job_title: row.job_title,
+        contract_type: "0h",
+        contract_hours: 0,
+        hourly_rate: 0,
+        monthly_salary: 0,
+        bank_hours: 0,
+        active: row.active,
+        created_at: "",
+        updated_at: "",
+      });
+    }
+    assignments.push({ employee_id: row.id, restaurant_id: row.restaurant_id, display_order: row.display_order });
+  }
+  return { employees: [...byId.values()], assignments };
+}
