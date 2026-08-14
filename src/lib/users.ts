@@ -79,3 +79,14 @@ export async function inviteEmployeeUser(input: {
 }): Promise<{ user_id: string; invited: boolean }> {
   return await invokeAdminUsers({ action: "invite_employee", ...input });
 }
+
+export async function setEmployeeAccess(input: {
+  employee_id: string;
+  active: boolean;
+}): Promise<void> {
+  await invokeAdminUsers({ action: "set_employee_access", ...input });
+}
+
+export async function deleteEmployeeAccess(employeeId: string): Promise<void> {
+  await invokeAdminUsers({ action: "delete_employee_access", employee_id: employeeId });
+}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { listRestaurants } from "../lib/restaurants";
 import { formatError } from "../lib/errors";
-import { inviteEmployeeUser } from "../lib/users";
+import { deleteEmployeeAccess, inviteEmployeeUser, setEmployeeAccess } from "../lib/users";
 import {
   createEmployee,
   deleteEmployee,
@@ -44,6 +44,7 @@ export function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [restaurantFilter, setRestaurantFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [accessBusyId, setAccessBusyId] = useState<string | null>(null);
 
   const canEdit = profile?.role === "super_admin" || profile?.role === "admin";
 
@@ -185,16 +186,60 @@ export function EmployeesPage() {
     }
   }
 
+  async function createAccess(employee: Employee) {
+    if (!canEdit) return;
+    if (!employee.email?.trim()) {
+      setError("Add an email address before creating app access.");
+      return;
+    }
+    setAccessBusyId(employee.id);
+    try {
+      const result = await inviteEmployeeUser({
+        employee_id: employee.id,
+        email: employee.email.trim(),
+        full_name: employee.name,
+        restaurant_ids: assignedRestaurantIds(employee.id),
+      });
+      setMessage(result.invited ? "Invitation sent." : "Existing user linked.");
+      await refresh();
+    } catch (error) {
+      setError(formatError(error));
+    } finally {
+      setAccessBusyId(null);
+    }
+  }
+
+  async function toggleAppAccess(employee: Employee, active: boolean) {
+    if (!canEdit || !employee.auth_user_id) return;
+    setAccessBusyId(employee.id);
+    try {
+      await setEmployeeAccess({ employee_id: employee.id, active });
+      setMessage(active ? "App access activated." : "App access deactivated.");
+    } catch (error) {
+      setError(formatError(error));
+    } finally {
+      setAccessBusyId(null);
+    }
+  }
+
   async function remove(employee: Employee) {
     if (!canEdit) return;
-    if (!window.confirm(t.confirmDeleteEmployee)) return;
+    const hasAccess = Boolean(employee.auth_user_id);
+    const warning = hasAccess
+      ? `${t.confirmDeleteEmployee}\n\nThis will also permanently remove the employee's login from Supabase Authentication.`
+      : t.confirmDeleteEmployee;
+    if (!window.confirm(warning)) return;
 
+    setAccessBusyId(employee.id);
     try {
+      if (hasAccess) await deleteEmployeeAccess(employee.id);
       await deleteEmployee(employee.id);
       setMessage(t.employeeDeleted);
       await refresh();
     } catch (error) {
       setError(formatError(error));
+    } finally {
+      setAccessBusyId(null);
     }
   }
 
@@ -297,6 +342,12 @@ export function EmployeesPage() {
                       </div>
 
                       <div className="badge-row">
+                        <span className={`badge ${employee.auth_user_id ? "" : "muted"}`}>
+                          {employee.auth_user_id ? "App access linked" : "No app access"}
+                        </span>
+                      </div>
+
+                      <div className="badge-row">
                         {names.length
                           ? names.map((name) => (
                               <span className="badge" key={name}>
@@ -311,10 +362,37 @@ export function EmployeesPage() {
                   {canEdit && (
                     <div className="employee-actions">
                       <button onClick={() => beginEdit(employee)}>{t.editEmployee}</button>
+                      {!employee.auth_user_id && employee.email && (
+                        <button
+                          className="secondary"
+                          disabled={accessBusyId === employee.id}
+                          onClick={() => void createAccess(employee)}
+                        >
+                          Create app access
+                        </button>
+                      )}
+                      {employee.auth_user_id && (
+                        <>
+                          <button
+                            className="secondary"
+                            disabled={accessBusyId === employee.id}
+                            onClick={() => void toggleAppAccess(employee, false)}
+                          >
+                            Disable app access
+                          </button>
+                          <button
+                            className="secondary"
+                            disabled={accessBusyId === employee.id}
+                            onClick={() => void toggleAppAccess(employee, true)}
+                          >
+                            Enable app access
+                          </button>
+                        </>
+                      )}
                       <button className="secondary" onClick={() => toggleActive(employee)}>
                         {employee.active ? t.deactivate : t.activate}
                       </button>
-                      <button className="danger" onClick={() => remove(employee)}>
+                      <button className="danger" disabled={accessBusyId === employee.id} onClick={() => void remove(employee)}>
                         {t.delete}
                       </button>
                     </div>

@@ -34,6 +34,7 @@ export interface Employee {
   employee_number: string | null;
   name: string;
   email: string | null;
+  auth_user_id?: string | null;
   phone: string | null;
   address: string | null;
   birth_date: string | null;

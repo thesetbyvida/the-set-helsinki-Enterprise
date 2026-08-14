@@ -47,6 +47,7 @@ export function AppShell({ children }: AppShellProps) {
   const visiblePages = allPages.filter(([id]) => {
     if (profile?.role === "employee") return ["rota", "mywork", "requests"].includes(id);
     if (profile?.role === "manager") return !["users", "payroll", "reports", "production", "audit", "settings"].includes(id);
+    if (id === "users") return profile?.role === "super_admin";
     if (id === "audit") return profile?.role === "super_admin" || profile?.role === "admin";
     return true;
   });

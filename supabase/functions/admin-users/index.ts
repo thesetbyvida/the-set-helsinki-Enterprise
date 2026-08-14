@@ -97,6 +97,60 @@ Deno.serve(async (req) => {
       return Response.json({ ok: true, user_id: userId, invited }, { headers: corsHeaders });
     }
 
+    if (action === "set_employee_access") {
+      const employeeId = String(body.employee_id || "");
+      const active = Boolean(body.active);
+      if (!employeeId) throw new Error("Employee is required");
+
+      const { data: employee, error: employeeError } = await adminClient
+        .from("employees")
+        .select("id,auth_user_id")
+        .eq("id", employeeId)
+        .single();
+      if (employeeError || !employee) throw employeeError || new Error("Employee not found");
+      if (!employee.auth_user_id) throw new Error("This employee has no app access");
+
+      const { error: profileUpdateError } = await adminClient
+        .from("profiles")
+        .update({ is_active: active })
+        .eq("id", employee.auth_user_id);
+      if (profileUpdateError) throw profileUpdateError;
+
+      return Response.json({ ok: true }, { headers: corsHeaders });
+    }
+
+    if (action === "delete_employee_access") {
+      const employeeId = String(body.employee_id || "");
+      if (!employeeId) throw new Error("Employee is required");
+
+      const { data: employee, error: employeeError } = await adminClient
+        .from("employees")
+        .select("id,auth_user_id")
+        .eq("id", employeeId)
+        .single();
+      if (employeeError || !employee) throw employeeError || new Error("Employee not found");
+
+      const userId = employee.auth_user_id as string | null;
+      if (!userId) return Response.json({ ok: true, deleted: false }, { headers: corsHeaders });
+
+      const { error: userRestaurantsError } = await adminClient
+        .from("user_restaurants")
+        .delete()
+        .eq("user_id", userId);
+      if (userRestaurantsError) throw userRestaurantsError;
+
+      const { error: profileDeleteError } = await adminClient
+        .from("profiles")
+        .delete()
+        .eq("id", userId);
+      if (profileDeleteError) throw profileDeleteError;
+
+      const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId);
+      if (authDeleteError) throw authDeleteError;
+
+      return Response.json({ ok: true, deleted: true }, { headers: corsHeaders });
+    }
+
     if (action === "create_user") {
       const email = String(body.email || "").trim().toLowerCase();
       const password = String(body.password || "");
