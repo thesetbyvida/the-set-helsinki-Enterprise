@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         // locate that existing account and link it instead of creating a duplicate.
         const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
           data: { full_name: fullName, role: "employee", employee_id: employeeId },
-          ...(appUrl ? { redirectTo: `${appUrl}/set-password` } : {}),
+          ...(appUrl ? { redirectTo: `${appUrl}/set-password?employee=${encodeURIComponent(employeeId)}` } : {}),
         });
         if (!inviteError && inviteData.user) {
           userId = inviteData.user.id;
