@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { listRestaurants } from "../lib/restaurants";
 import { formatError } from "../lib/errors";
+import { inviteEmployeeUser } from "../lib/users";
 import {
   createEmployee,
   deleteEmployee,
@@ -151,7 +152,22 @@ export function EmployeesPage() {
       else employee = await createEmployee(form);
 
       await saveEmployeeRestaurants(employee.id, selectedRestaurants);
-      setMessage(t.employeeSaved);
+
+      // Phase 6.2.1: when a NEW employee has an email address, automatically
+      // create/invite the matching Supabase Auth user and link it to the employee.
+      // Editing an existing employee does not resend an invitation.
+      if (!editingId && employee.email?.trim()) {
+        const result = await inviteEmployeeUser({
+          employee_id: employee.id,
+          email: employee.email.trim(),
+          full_name: employee.name,
+          restaurant_ids: selectedRestaurants,
+        });
+        setMessage(`${t.employeeSaved} ${result.invited ? "Invitación enviada." : "Usuario vinculado."}`);
+      } else {
+        setMessage(t.employeeSaved);
+      }
+
       cancelEdit();
       await refresh();
     } catch (error) {

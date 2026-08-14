@@ -70,3 +70,12 @@ export async function createManagedUser(input: CreateUserInput): Promise<void> {
 export async function changeManagedPassword(userId: string, password: string): Promise<void> {
   await invokeAdminUsers({ action: "update_password", user_id: userId, password });
 }
+
+export async function inviteEmployeeUser(input: {
+  employee_id: string;
+  email: string;
+  full_name: string;
+  restaurant_ids: string[];
+}): Promise<{ user_id: string; invited: boolean }> {
+  return await invokeAdminUsers({ action: "invite_employee", ...input });
+}
