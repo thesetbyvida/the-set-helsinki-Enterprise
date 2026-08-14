@@ -12,9 +12,24 @@ type OtSummary = { overtime:number; bankDelta:number };
 
 const fmtTime=(v:string|null)=>v?v.slice(0,5):"—";
 const n=(v:number)=>Number(v||0).toFixed(2);
-function iso(d:Date){ return d.toISOString().slice(0,10); }
-function periodFor(anchor:Date){ const y=anchor.getFullYear(),m=anchor.getMonth(),day=anchor.getDate(); const start=day>=21?new Date(y,m,21):new Date(y,m-1,21); const end=new Date(start.getFullYear(),start.getMonth()+1,20); return {start:iso(start),end:iso(end)}; }
-function movePeriod(start:string,delta:number){ const d=new Date(start+"T12:00:00"); d.setMonth(d.getMonth()+delta); return periodFor(d); }
+function localIso(d:Date){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function periodFor(anchor:Date){
+  const y=anchor.getFullYear(),m=anchor.getMonth(),day=anchor.getDate();
+  const start=day>=21?new Date(y,m,21,12):new Date(y,m-1,21,12);
+  const end=new Date(start.getFullYear(),start.getMonth()+1,20,12);
+  return {start:localIso(start),end:localIso(end)};
+}
+function movePeriod(start:string,delta:number){
+  const [y,m]=start.split("-").map(Number);
+  const nextStart=new Date(y,m-1+delta,21,12);
+  const nextEnd=new Date(nextStart.getFullYear(),nextStart.getMonth()+1,20,12);
+  return {start:localIso(nextStart),end:localIso(nextEnd)};
+}
 
 export default function EmployeePortalPage(){
   const { language } = useApp();
@@ -27,6 +42,7 @@ export default function EmployeePortalPage(){
     title:"My work",subtitle:"Your own hours, shifts and balances. No salary amounts.",refresh:"Refresh",hours:"Hours · payroll period",period:"21st → 20th · hours only",prev:"← Previous",next:"Next →",worked:"Worked",evening:"Evening",night:"Night",sunday:"Sunday",holiday:"Holiday",aatto:"Aatto",sick:"S",vacation:"VL",vv:"VV",overtime:"Overtime",bank:"Hour bank",employee:"Employee",vvAvailable:"VV available",nextVv:"Next VV",upcoming:"Upcoming shifts",pending:"Pending requests",periodDetail:"Period shifts",recent:"Recent shifts",date:"Date",turn:"Turn",restaurant:"Restaurant",shift:"Shift",code:"Code",shiftHours:"Hours",notes:"Notes",none:"No shifts found.",notLinked:"Your login is not linked to an employee record yet.",records:"shift records in this period",earned:"earned",used:"used",hoursToNext:"h to next VV"
   };
   const fmtDate=(v:string)=>new Intl.DateTimeFormat(locale,{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(v+"T12:00:00"));
+  const fmtPeriodDate=(v:string)=>new Intl.DateTimeFormat(locale,{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(v+"T12:00:00"));
 
   const [profile,setProfile]=useState<Profile|null>(null); const [employee,setEmployee]=useState<Employee|null>(null);
   const [schedule,setSchedule]=useState<Shift[]>([]); const [periodShifts,setPeriodShifts]=useState<Shift[]>([]); const [breakdown,setBreakdown]=useState<TesBreakdown>(emptyTes());
@@ -52,7 +68,7 @@ export default function EmployeePortalPage(){
     setEmployee(e as Employee|null); if(!e) return;
 
     const today=new Date(),from=new Date(today),to=new Date(today); from.setDate(from.getDate()-21); to.setDate(to.getDate()+56);
-    const {data:s,error:sErr}=await supabase.from("rota_shifts").select("id,shift_date,shift_slot,start_time,end_time,code,note,restaurant_id").eq("employee_id",e.id).gte("shift_date",iso(from)).lte("shift_date",iso(to)).order("shift_date").order("shift_slot"); if(sErr) throw sErr;
+    const {data:s,error:sErr}=await supabase.from("rota_shifts").select("id,shift_date,shift_slot,start_time,end_time,code,note,restaurant_id").eq("employee_id",e.id).gte("shift_date",localIso(from)).lte("shift_date",localIso(to)).order("shift_date").order("shift_slot"); if(sErr) throw sErr;
     const ids=[...new Set((s||[]).map((x:any)=>x.restaurant_id).filter(Boolean))] as string[]; const map=await restaurantMap(ids); setSchedule((s||[]).map((x:any)=>({...x,restaurant_name:map[x.restaurant_id]||null})));
 
     const year=new Date().getFullYear(),ys=`${year}-01-01`,ye=`${year}-12-31`;
@@ -80,8 +96,8 @@ export default function EmployeePortalPage(){
   }catch(e:any){ setError(e?.message||String(e)); }
   }
 
-  const upcoming=useMemo(()=>{const t=iso(new Date());return schedule.filter(s=>s.shift_date>=t).slice(0,20)},[schedule]);
-  const recent=useMemo(()=>{const t=iso(new Date());return schedule.filter(s=>s.shift_date<t).slice(-8).reverse()},[schedule]);
+  const upcoming=useMemo(()=>{const t=localIso(new Date());return schedule.filter(s=>s.shift_date>=t).slice(0,20)},[schedule]);
+  const recent=useMemo(()=>{const t=localIso(new Date());return schedule.filter(s=>s.shift_date<t).slice(-8).reverse()},[schedule]);
   const specialDaysForPeriod=useMemo(()=>[] as SpecialDay[],[period.start,period.end]);
   const shiftHours=(s:Shift)=>calculateShiftTes(s as any,specialDaysForPeriod).base_hours;
   const nextVv=hoursToNextVv(vv.worked,vv.earned,200,9);
@@ -92,7 +108,7 @@ export default function EmployeePortalPage(){
     {error&&<div className="error-banner">{error}</div>}
     {!employee&&<div className="info-banner">{words.notLinked}</div>}
 
-    <section className="page-card"><div className="section-title-row"><div><h2>{words.hours}</h2><p className="muted">{words.period}</p></div><div className="inline-actions"><button className="secondary" onClick={()=>setPeriod(movePeriod(period.start,-1))}>{words.prev}</button><strong>{period.start} → {period.end}</strong><button className="secondary" onClick={()=>setPeriod(movePeriod(period.start,1))}>{words.next}</button></div></div>
+    <section className="page-card"><div className="section-title-row"><div><h2>{words.hours}</h2><p className="muted">{words.period}</p></div><div className="inline-actions"><button className="secondary" onClick={()=>setPeriod(movePeriod(period.start,-1))}>{words.prev}</button><strong className="employee-period-range">{fmtPeriodDate(period.start)} → {fmtPeriodDate(period.end)}</strong><button className="secondary" onClick={()=>setPeriod(movePeriod(period.start,1))}>{words.next}</button></div></div>
       <div className="stats-grid">
         <div className="stat-card"><span>{words.worked}</span><strong>{n(breakdown.worked_hours)} h</strong></div><div className="stat-card"><span>{words.evening}</span><strong>{n(breakdown.evening_hours)} h</strong></div><div className="stat-card"><span>{words.night}</span><strong>{n(breakdown.night_hours)} h</strong></div><div className="stat-card"><span>{words.sunday}</span><strong>{n(breakdown.sunday_hours)} h</strong></div><div className="stat-card"><span>{words.holiday}</span><strong>{n(breakdown.holiday_hours)} h</strong></div><div className="stat-card"><span>{words.aatto}</span><strong>{n(breakdown.eve_hours)} h</strong></div><div className="stat-card"><span>{words.sick}</span><strong>{n(breakdown.sick_hours)} h</strong></div><div className="stat-card"><span>{words.vacation}</span><strong>{n(breakdown.vacation_hours)} h</strong></div><div className="stat-card"><span>{words.vv}</span><strong>{n(breakdown.vv_days)}</strong></div><div className="stat-card"><span>{words.overtime}</span><strong>{n(ot.overtime)} h</strong></div><div className="stat-card"><span>{words.bank}</span><strong>{n(Number(employee?.bank_hours||0))} h</strong><small>{ot.bankDelta>=0?"+":""}{n(ot.bankDelta)} h period Δ</small></div>
       </div><p className="muted">{periodShifts.length} {words.records}.</p>

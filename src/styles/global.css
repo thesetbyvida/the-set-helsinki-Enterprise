@@ -371,3 +371,38 @@ button.small{padding:6px 9px;font-size:12px}
 }
 
 .rota-save-status{display:flex;align-items:center;gap:8px;white-space:nowrap}.rota-autosave{font-weight:700}.rota-autosave.pending{color:#475569}.rota-autosave.saving{color:#1d4ed8}.rota-autosave.saved{color:#166534}.rota-autosave.failed{color:#991b1b}
+
+/* Phase 6.4.1 — Employee My Work final visual polish */
+.page-stack{display:grid;gap:16px}
+.page-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:20px;box-shadow:0 6px 20px rgba(15,23,42,.05)}
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.page-header h1{margin:0 0 6px;font-size:28px}
+.page-header p{margin:0}
+.section-title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px}
+.section-title-row h2{margin:0 0 4px}
+.section-title-row p{margin:0}
+.inline-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.employee-period-range{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 12px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc;color:#0f172a;white-space:nowrap}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat-card{display:grid;gap:6px;align-content:start;min-height:92px;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc)}
+.stat-card span{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.045em;color:#64748b}
+.stat-card strong{font-size:22px;line-height:1.15;color:#0f172a}
+.stat-card small{font-size:12px;color:#64748b}
+.table-wrap{max-width:100%;overflow:auto;border:1px solid #e5e7eb;border-radius:12px}
+.data-table{width:100%;border-collapse:separate;border-spacing:0;min-width:820px;background:#fff}
+.data-table th,.data-table td{padding:10px 12px;border-bottom:1px solid #eef2f7;text-align:left;white-space:nowrap}
+.data-table thead th{position:sticky;top:0;z-index:2;background:#f8fafc;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.035em}
+.data-table tbody tr:hover td{background:#f8fafc}
+.data-table tbody tr:last-child td{border-bottom:0}
+.error-banner,.info-banner{padding:12px 14px;border-radius:12px;border:1px solid}
+.error-banner{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.info-banner{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a}
+.employee-self-service .page-card>h2{margin-top:0}
+.employee-self-service .employee-mini-list{border:1px solid #eef2f7;border-radius:12px;padding:0 12px;background:#fff}
+@media(max-width:800px){
+  .page-header,.section-title-row{align-items:stretch;display:grid}
+  .inline-actions{display:grid;grid-template-columns:1fr;gap:8px}
+  .employee-period-range{width:100%}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:520px){.stats-grid{grid-template-columns:1fr}}
