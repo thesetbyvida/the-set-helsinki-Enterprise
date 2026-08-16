@@ -44,6 +44,8 @@ export interface Employee {
   hourly_rate: number;
   monthly_salary: number;
   bank_hours: number;
+  can_edit_own_hours?: boolean;
+  time_edit_requires_approval?: boolean;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -74,6 +76,10 @@ export interface RotaShift {
   shift_slot: number;
   start_time: string | null;
   end_time: string | null;
+  actual_start_time?: string | null;
+  actual_end_time?: string | null;
+  actual_approved_at?: string | null;
+  actual_approved_by?: string | null;
   code: string;
   note: string;
   created_at: string;

@@ -29,6 +29,8 @@ function emptyForm(): EmployeeInput {
     hourly_rate: 0,
     monthly_salary: 0,
     bank_hours: 0,
+    can_edit_own_hours: false,
+    time_edit_requires_approval: true,
     active: true,
   };
 }
@@ -119,6 +121,8 @@ export function EmployeesPage() {
       hourly_rate: Number(employee.hourly_rate || 0),
       monthly_salary: Number(employee.monthly_salary || 0),
       bank_hours: Number(employee.bank_hours || 0),
+      can_edit_own_hours: Boolean(employee.can_edit_own_hours),
+      time_edit_requires_approval: employee.time_edit_requires_approval !== false,
       active: employee.active,
     });
     setSelectedRestaurants(assignedRestaurantIds(employee.id));
@@ -345,6 +349,14 @@ export function EmployeesPage() {
                         <span className={`badge ${employee.auth_user_id ? "" : "muted"}`}>
                           {employee.auth_user_id ? "App access linked" : "No app access"}
                         </span>
+                        <span className={`badge ${employee.can_edit_own_hours ? "" : "muted"}`}>
+                          {employee.can_edit_own_hours ? "Own time corrections enabled" : "Own time corrections disabled"}
+                        </span>
+                        {employee.can_edit_own_hours && (
+                          <span className="badge">
+                            {employee.time_edit_requires_approval === false ? "Direct approval" : "Admin approval required"}
+                          </span>
+                        )}
                       </div>
 
                       <div className="badge-row">
@@ -564,6 +576,28 @@ export function EmployeesPage() {
               disabled={!canEdit}
             />
           </label>
+
+          <fieldset className="time-permission-fieldset" disabled={!canEdit}>
+            <legend>Employee time corrections</legend>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.can_edit_own_hours}
+                onChange={(event) => setForm({ ...form, can_edit_own_hours: event.target.checked })}
+              />
+              Allow employee to submit corrections to own actual hours
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.time_edit_requires_approval}
+                onChange={(event) => setForm({ ...form, time_edit_requires_approval: event.target.checked })}
+                disabled={!form.can_edit_own_hours || !canEdit}
+              />
+              Require Admin / Super Admin approval before hours affect HourCalc and Payroll
+            </label>
+            <p className="muted">Scheduled rota stays unchanged. Approved actual times are stored separately and used for hour calculations.</p>
+          </fieldset>
 
           <fieldset disabled={!canEdit}>
             <legend>{t.assignedRestaurants}</legend>

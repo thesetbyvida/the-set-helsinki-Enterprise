@@ -99,6 +99,12 @@ export async function listPayrollShifts(restaurantId: string, start: string, end
   return (data || []) as RotaShift[];
 }
 
+
+export function effectivePayrollShift(shift: RotaShift): RotaShift {
+  if (!shift.actual_start_time || !shift.actual_end_time || !shift.actual_approved_at) return shift;
+  return { ...shift, start_time: shift.actual_start_time, end_time: shift.actual_end_time };
+}
+
 export async function listPayrollSpecialDays(start: string, end: string): Promise<SpecialDay[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from("tes_special_days").select("date,kind,label,premium_start,premium_end").gte("date", start).lte("date", end).order("date");
@@ -124,7 +130,7 @@ export function aggregatePayrollHours(shifts: RotaShift[], specialDays: SpecialD
   const out = new Map<string, TesBreakdown>();
   for (const shift of shifts) {
     const current = out.get(shift.employee_id) || emptyTes();
-    out.set(shift.employee_id, addTes(current, calculateShiftTes(shift, specialDays)));
+    out.set(shift.employee_id, addTes(current, calculateShiftTes(effectivePayrollShift(shift), specialDays)));
   }
   return out;
 }
@@ -146,7 +152,7 @@ export function calculateOvertimeByEmployee(
 
   for (const shift of shifts) {
     if (!periodMap.has(shift.period_id)) continue;
-    const worked = calculateShiftTes(shift, specialDays).worked_hours;
+    const worked = calculateShiftTes(effectivePayrollShift(shift), specialDays).worked_hours;
     const byPeriod = grouped.get(shift.employee_id) || new Map<string, number>();
     byPeriod.set(shift.period_id, (byPeriod.get(shift.period_id) || 0) + worked);
     grouped.set(shift.employee_id, byPeriod);

@@ -36,11 +36,16 @@ export async function listShiftsForRange(
   return (data || []) as RotaShift[];
 }
 
+export function effectiveHourCalcShift(shift: RotaShift): RotaShift {
+  if (!shift.actual_start_time || !shift.actual_end_time || !shift.actual_approved_at) return shift;
+  return { ...shift, start_time: shift.actual_start_time, end_time: shift.actual_end_time };
+}
+
 export function calculateEmployees(shifts: RotaShift[], specialDays: SpecialDay[]): Map<string, TesBreakdown> {
   const result = new Map<string, TesBreakdown>();
   for (const shift of shifts) {
     const current = result.get(shift.employee_id) || emptyTes();
-    result.set(shift.employee_id, addTes(current, calculateShiftTes(shift, specialDays)));
+    result.set(shift.employee_id, addTes(current, calculateShiftTes(effectiveHourCalcShift(shift), specialDays)));
   }
   return result;
 }

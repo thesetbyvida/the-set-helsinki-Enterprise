@@ -14,6 +14,8 @@ export type EmployeeInput = {
   hourly_rate: number;
   monthly_salary: number;
   bank_hours: number;
+  can_edit_own_hours: boolean;
+  time_edit_requires_approval: boolean;
   active: boolean;
 };
 
@@ -45,6 +47,8 @@ export async function createEmployee(input: EmployeeInput): Promise<Employee> {
       hourly_rate: input.hourly_rate,
       monthly_salary: input.monthly_salary,
       bank_hours: input.bank_hours,
+      can_edit_own_hours: input.can_edit_own_hours,
+      time_edit_requires_approval: input.time_edit_requires_approval,
       active: input.active,
     })
     .select()
@@ -70,6 +74,8 @@ export async function updateEmployee(id: string, input: EmployeeInput): Promise<
       hourly_rate: input.hourly_rate,
       monthly_salary: input.monthly_salary,
       bank_hours: input.bank_hours,
+      can_edit_own_hours: input.can_edit_own_hours,
+      time_edit_requires_approval: input.time_edit_requires_approval,
       active: input.active,
       updated_at: new Date().toISOString(),
     })
@@ -160,6 +166,8 @@ export async function listRotaDirectory(): Promise<{ employees: Employee[]; assi
         hourly_rate: 0,
         monthly_salary: 0,
         bank_hours: 0,
+        can_edit_own_hours: false,
+        time_edit_requires_approval: true,
         active: row.active,
         created_at: "",
         updated_at: "",
