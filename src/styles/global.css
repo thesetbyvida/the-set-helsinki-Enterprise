@@ -434,3 +434,15 @@ button.small{padding:6px 9px;font-size:12px}
   line-height: 1.2;
 }
 .actual-persistent-badge strong { color: #166534; }
+
+
+/* Phase 6.5.5 — Scheduled vs Actual totals */
+.day-total-comparison { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+.day-total-comparison strong { color: #087a43; }
+.rota-week-total-comparison { display: flex; flex-direction: column; gap: 4px; white-space: nowrap; }
+.rota-week-total-comparison .scheduled-total { color: #526173; font-size: 0.72rem; }
+.rota-week-total-comparison .actual-total { color: #087a43; font-size: 0.78rem; }
+@media print {
+  .rota-week-total-comparison .scheduled-total,
+  .rota-week-total-comparison .actual-total { font-size: 8pt; }
+}

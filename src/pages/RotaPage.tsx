@@ -45,6 +45,19 @@ function hoursLabel(value: number) {
   return value ? value.toFixed(2).replace(/\.00$/, "") : "";
 }
 
+function actualHours(actual: ActualShiftInfo | undefined, scheduled: ShiftDraft) {
+  if (!actual?.actual_start_time || !actual?.actual_end_time || !actual.actual_approved_at) return shiftHours(scheduled);
+  return shiftHours({
+    ...scheduled,
+    start_time: actual.actual_start_time,
+    end_time: actual.actual_end_time,
+  });
+}
+
+function totalsDiffer(a: number, b: number) {
+  return Math.abs(a - b) > 0.001;
+}
+
 type RotaQaIssue = {
   employeeId: string;
   date: string;
@@ -615,7 +628,7 @@ export function RotaPage() {
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
       <div className="phase-card rota-tip no-print">
-        <strong>Phase 6.5.4:</strong> {language === "fi" ? "Käytä Suunniteltu-tilaa julkaistun työvuoron muokkaukseen ja Toteutuneet-tilaa toteutuneiden tuntien korjaukseen ilman alkuperäisen vuoron korvaamista." : language === "es" ? "Usa Programado para modificar el horario publicado y Horas reales para corregir lo trabajado sin sobrescribir el Rota original." : "Use Scheduled to edit the published rota and Actual hours to correct worked time without overwriting the original shift."}
+        <strong>Phase 6.5.5:</strong> {language === "fi" ? "Käytä Suunniteltu-tilaa julkaistun työvuoron muokkaukseen ja Toteutuneet-tilaa toteutuneiden tuntien korjaukseen ilman alkuperäisen vuoron korvaamista." : language === "es" ? "Usa Programado para modificar el horario publicado y Horas reales para corregir lo trabajado sin sobrescribir el Rota original." : "Use Scheduled to edit the published rota and Actual hours to correct worked time without overwriting the original shift."}
       </div>
 
       <div className={`rota-qa-card no-print ${qaIssues.length ? "has-errors" : "is-ready"}`}>
@@ -671,8 +684,14 @@ export function RotaPage() {
                     </thead>
                     <tbody>
                       {restaurantEmployees.map((employee) => {
-                        const weekTotal = weekDates.reduce((sum, date) => {
+                        const weekScheduledTotal = weekDates.reduce((sum, date) => {
                           return sum + slotsForCell(employee.id, date).reduce((daySum, slot) => daySum + shiftHours(shifts[shiftKey(employee.id, date, slot)]), 0);
+                        }, 0);
+                        const weekActualTotal = weekDates.reduce((sum, date) => {
+                          return sum + slotsForCell(employee.id, date).reduce((daySum, slot) => {
+                            const key = shiftKey(employee.id, date, slot);
+                            return daySum + actualHours(actualShifts[key], shifts[key] || EMPTY_SHIFT);
+                          }, 0);
                         }, 0);
                         return (
                           <tr key={employee.id}>
@@ -697,7 +716,11 @@ export function RotaPage() {
                             </th>
                             {weekDates.map((date) => {
                               const slots = slotsForCell(employee.id, date);
-                              const dayTotal = slots.reduce((sum, slot) => sum + shiftHours(shifts[shiftKey(employee.id, date, slot)]), 0);
+                              const dayScheduledTotal = slots.reduce((sum, slot) => sum + shiftHours(shifts[shiftKey(employee.id, date, slot)]), 0);
+                              const dayActualTotal = slots.reduce((sum, slot) => {
+                                const key = shiftKey(employee.id, date, slot);
+                                return sum + actualHours(actualShifts[key], shifts[key] || EMPTY_SHIFT);
+                              }, 0);
                               const cellDirty = slots.some((slot) => dirty.has(shiftKey(employee.id, date, slot)));
                               return (
                                 <td key={date} className={`${cellDirty ? "dirty " : ""}${cellHasQaIssue(employee.id, date) ? "qa-error" : ""}`.trim()}>
@@ -776,7 +799,14 @@ export function RotaPage() {
                                     {canEdit && slots.length < MAX_SHIFTS_PER_DAY && (
                                       <button type="button" className="add-shift-button" onClick={() => addShift(employee.id, date)}>+ {language === "es" ? "Turno" : language === "fi" ? "Vuoro" : "Shift"}</button>
                                     )}
-                                    {dayTotal > 0 && slots.length > 1 && <div className="day-shift-total">{language === "es" ? "Día" : language === "fi" ? "Päivä" : "Day"}: {hoursLabel(dayTotal)} h</div>}
+                                    {dayScheduledTotal > 0 && slots.length > 1 && (
+                                      <div className="day-shift-total day-total-comparison">
+                                        <span>{language === "es" ? "Programado" : language === "fi" ? "Suunniteltu" : "Scheduled"}: {hoursLabel(dayScheduledTotal)} h</span>
+                                        {totalsDiffer(dayScheduledTotal, dayActualTotal) && (
+                                          <strong>{language === "es" ? "Actual" : language === "fi" ? "Toteutunut" : "Actual"}: {hoursLabel(dayActualTotal)} h ✓</strong>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="print-shift-list">
                                     {slots.map((slot) => {
@@ -792,12 +822,24 @@ export function RotaPage() {
                                         </div>
                                       );
                                     })}
-                                    {slots.length > 1 && dayTotal > 0 && <span className="print-day-total">{hoursLabel(dayTotal)} h</span>}
+                                    {slots.length > 1 && dayScheduledTotal > 0 && (
+                                      <span className="print-day-total">
+                                        Scheduled {hoursLabel(dayScheduledTotal)} h
+                                        {printActual && totalsDiffer(dayScheduledTotal, dayActualTotal) ? ` · Actual ${hoursLabel(dayActualTotal)} h` : ""}
+                                      </span>
+                                    )}
                                   </div>
                                 </td>
                               );
                             })}
-                            <td className="total-col"><strong>{hoursLabel(weekTotal)} h</strong></td>
+                            <td className="total-col">
+                              <div className="rota-week-total-comparison">
+                                <span className="scheduled-total">{language === "es" ? "Prog." : language === "fi" ? "Suunn." : "Sched."} <strong>{hoursLabel(weekScheduledTotal)} h</strong></span>
+                                {totalsDiffer(weekScheduledTotal, weekActualTotal) && (
+                                  <span className="actual-total">{language === "es" ? "Actual" : language === "fi" ? "Toteut." : "Actual"} <strong>{hoursLabel(weekActualTotal)} h</strong> ✓</span>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
