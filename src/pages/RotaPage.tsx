@@ -615,7 +615,7 @@ export function RotaPage() {
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
       <div className="phase-card rota-tip no-print">
-        <strong>Phase 6.5.2:</strong> {language === "fi" ? "Käytä Suunniteltu-tilaa julkaistun työvuoron muokkaukseen ja Toteutuneet-tilaa toteutuneiden tuntien korjaukseen ilman alkuperäisen vuoron korvaamista." : language === "es" ? "Usa Programado para modificar el horario publicado y Horas reales para corregir lo trabajado sin sobrescribir el Rota original." : "Use Scheduled to edit the published rota and Actual hours to correct worked time without overwriting the original shift."}
+        <strong>Phase 6.5.4:</strong> {language === "fi" ? "Käytä Suunniteltu-tilaa julkaistun työvuoron muokkaukseen ja Toteutuneet-tilaa toteutuneiden tuntien korjaukseen ilman alkuperäisen vuoron korvaamista." : language === "es" ? "Usa Programado para modificar el horario publicado y Horas reales para corregir lo trabajado sin sobrescribir el Rota original." : "Use Scheduled to edit the published rota and Actual hours to correct worked time without overwriting the original shift."}
       </div>
 
       <div className={`rota-qa-card no-print ${qaIssues.length ? "has-errors" : "is-ready"}`}>
@@ -716,6 +716,11 @@ export function RotaPage() {
                                           )}
                                           {rotaEditMode === "scheduled" || !canEditActual ? <>
                                             <div className="scheduled-edit-label">{language === "es" ? "Programado" : language === "fi" ? "Suunniteltu" : "Scheduled"}</div>
+                                            {actualShifts[key]?.actual_start_time && actualShifts[key]?.actual_end_time && (
+                                              <div className="actual-persistent-badge">
+                                                <strong>{language === "es" ? "ACTUAL" : language === "fi" ? "TOTEUTUNUT" : "ACTUAL"}: {actualShifts[key].actual_start_time}–{actualShifts[key].actual_end_time} ✓</strong>
+                                              </div>
+                                            )}
                                             <div className="shift-time-row">
                                               <input aria-label={`Start ${slot}`} type="time" value={shift.start_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { start_time: e.target.value || null })} />
                                               <span>–</span>
@@ -756,7 +761,7 @@ export function RotaPage() {
                                             return (
                                               <div className="actual-hours-box">
                                                 {hasActual && <div className="actual-hours-approved"><div><strong>{language === "es" ? "Programado" : language === "fi" ? "Suunniteltu" : "Scheduled"}: {shift.start_time && shift.end_time ? `${displayTime(shift.start_time)}–${displayTime(shift.end_time)}` : "—"}</strong></div><div><strong>{language === "es" ? "Actual ✓" : language === "fi" ? "Toteutunut ✓" : "Actual ✓"}: {actual.actual_start_time}–{actual.actual_end_time}</strong></div></div>}
-                                                {canEditActual && actualEditorKey !== key && <button type="button" className="small secondary actual-edit-button" onClick={() => openActualEditor(key)}>{hasActual ? (language === "es" ? "Editar horas reales" : language === "fi" ? "Muokkaa toteutuneita" : "Edit actual hours") : (language === "es" ? "Añadir horas reales" : language === "fi" ? "Lisää toteutuneet" : "Add actual hours")}</button>}
+                                                {canEditActual && actualEditorKey !== key && <button type="button" className="small secondary actual-edit-button" onClick={() => openActualEditor(key)}>{hasActual ? (language === "es" ? "Editar horas reales" : language === "fi" ? "Muokkaa toteutuneita" : "Edit actual hours") : (language === "es" ? "Añadir horas reales" : language === "fi" ? "Lisää toteutuneet" : "Correct actual hours")}</button>}
                                                 {canEditActual && actualEditorKey === key && <div className="actual-hours-editor">
                                                   <div className="shift-time-row"><input type="time" value={actualDraft.start} onChange={(e) => setActualDraft((d) => ({ ...d, start: e.target.value }))}/><span>–</span><input type="time" value={actualDraft.end} onChange={(e) => setActualDraft((d) => ({ ...d, end: e.target.value }))}/></div>
                                                   <input type="text" placeholder={language === "es" ? "Motivo / nota" : language === "fi" ? "Syy / huomautus" : "Reason / note"} value={actualDraft.note} onChange={(e) => setActualDraft((d) => ({ ...d, note: e.target.value }))}/>

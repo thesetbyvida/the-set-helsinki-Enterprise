@@ -422,3 +422,15 @@ button.small{padding:6px 9px;font-size:12px}
 
 /* Phase 6.5.2 — preserve scheduled rota while editing actual hours */
 .rota-edit-mode{display:flex;gap:4px;align-items:end}.rota-edit-mode button{white-space:nowrap}.rota-edit-mode button.active{box-shadow:0 0 0 2px rgba(15,23,42,.12) inset}.scheduled-edit-label,.actual-inline-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#64748b}.actual-inline-editor{display:grid;gap:5px;padding:7px;border:1px solid #86efac;border-radius:8px;background:#f0fdf4}.scheduled-reference{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;background:#f8fafc;color:#475569;font-size:10px}.scheduled-reference span{font-weight:700}.actual-inline-note{width:100%;padding:6px;font-size:11px}.actual-inline-actions{display:flex;gap:4px;flex-wrap:wrap}.actual-inline-empty{padding:7px;border-radius:7px;background:#fff7ed;color:#9a3412;font-size:10px}.rota-page .actual-inline-editor .shift-time-row input{border-color:#86efac;background:#fff}
+
+/* Phase 6.5.4 — keep approved actual hours visible even while editing Scheduled */
+.actual-persistent-badge {
+  margin: 4px 0 6px;
+  padding: 5px 7px;
+  border: 1px solid #86efac;
+  border-radius: 7px;
+  background: #f0fdf4;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.actual-persistent-badge strong { color: #166534; }
