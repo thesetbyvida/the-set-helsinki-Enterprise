@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabase";
 import { useApp } from "../context/AppContext";
 import { listRestaurants, listRotaRestaurants } from "../lib/restaurants";
 import { listEmployeeRestaurants, listEmployees, listRotaDirectory, saveRestaurantEmployeeOrder } from "../lib/employees";
@@ -19,6 +20,14 @@ import {
 import type { Employee, EmployeeRestaurant, Restaurant, RotaPeriod } from "../types/app";
 
 type ShiftMap = Record<string, ShiftDraft>;
+type ActualShiftInfo = {
+  id: string;
+  actual_start_time: string | null;
+  actual_end_time: string | null;
+  actual_approved_at: string | null;
+  actual_approved_by: string | null;
+};
+type ActualShiftMap = Record<string, ActualShiftInfo>;
 const EMPTY_SHIFT: ShiftDraft = { start_time: null, end_time: null, code: "", note: "" };
 const CODES = ["", "s", "vl", "vv", "v", "vp"];
 const MAX_SHIFTS_PER_DAY = 4;
@@ -83,6 +92,12 @@ export function RotaPage() {
   const [ordering, setOrdering] = useState(false);
   const [draggedEmployeeId, setDraggedEmployeeId] = useState<string | null>(null);
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "waiting" | "saving" | "saved" | "error">("idle");
+  const [actualShifts, setActualShifts] = useState<ActualShiftMap>({});
+  const [actualEditorKey, setActualEditorKey] = useState<string | null>(null);
+  const [actualDraft, setActualDraft] = useState({ start: "", end: "", note: "" });
+  const [savingActual, setSavingActual] = useState(false);
+  const [printActual, setPrintActual] = useState(true);
+  const canEditActual = Boolean(profile && ["super_admin", "admin"].includes(profile.role));
 
   const locale = language === "fi" ? "fi-FI" : language === "en" ? "en-GB" : "es-ES";
   const addShiftLabel = language === "fi" ? "Lisää vuoro" : language === "es" ? "Agregar turno" : "Add shift";
@@ -152,6 +167,8 @@ export function RotaPage() {
         setMessage("");
         setDirty(new Set());
         setVisibleExtraSlots(new Set());
+        setActualShifts({});
+        setActualEditorKey(null);
         const found = await findRotaPeriod(restaurantId, startDate);
         setPeriod(found);
         if (!found) {
@@ -160,18 +177,28 @@ export function RotaPage() {
         }
         const rows = await listRotaShifts(found.id);
         const next: ShiftMap = {};
+        const nextActual: ActualShiftMap = {};
         const extras = new Set<string>();
         for (const row of rows) {
           const slot = Number(row.shift_slot || 1);
-          next[shiftKey(row.employee_id, row.shift_date, slot)] = {
+          const key = shiftKey(row.employee_id, row.shift_date, slot);
+          next[key] = {
             start_time: row.start_time ? displayTime(row.start_time) : null,
             end_time: row.end_time ? displayTime(row.end_time) : null,
             code: row.code || "",
             note: row.note || "",
           };
+          nextActual[key] = {
+            id: row.id,
+            actual_start_time: row.actual_start_time ? displayTime(row.actual_start_time) : null,
+            actual_end_time: row.actual_end_time ? displayTime(row.actual_end_time) : null,
+            actual_approved_at: row.actual_approved_at || null,
+            actual_approved_by: row.actual_approved_by || null,
+          };
           if (slot > 1) extras.add(shiftKey(row.employee_id, row.shift_date, slot));
         }
         setShifts(next);
+        setActualShifts(nextActual);
         setVisibleExtraSlots(extras);
       } catch (e) {
         setError(formatError(e));
@@ -411,6 +438,72 @@ export function RotaPage() {
     void applyEmployeeOrder(ids);
   }
 
+  function openActualEditor(key: string) {
+    const scheduled = shifts[key] || EMPTY_SHIFT;
+    const actual = actualShifts[key];
+    if (!actual?.id) {
+      setError(language === "es" ? "Guarda primero el turno programado." : language === "fi" ? "Tallenna suunniteltu vuoro ensin." : "Save the scheduled shift first.");
+      return;
+    }
+    setActualDraft({
+      start: actual.actual_start_time || scheduled.start_time || "",
+      end: actual.actual_end_time || scheduled.end_time || "",
+      note: "",
+    });
+    setActualEditorKey(key);
+    setError("");
+  }
+
+  async function saveActualHours(key: string) {
+    if (!canEditActual) return;
+    const actual = actualShifts[key];
+    if (!actual?.id || !actualDraft.start || !actualDraft.end) return;
+    if (actualDraft.start === actualDraft.end) {
+      setError(language === "es" ? "La hora de entrada y salida no pueden ser iguales." : language === "fi" ? "Alku- ja loppuaika eivät voi olla samat." : "Start and end time cannot be equal.");
+      return;
+    }
+    try {
+      setSavingActual(true);
+      setError("");
+      const { error: rpcError } = await supabase.rpc("set_actual_shift_time", {
+        p_shift_id: actual.id,
+        p_actual_start_time: actualDraft.start,
+        p_actual_end_time: actualDraft.end,
+        p_note: actualDraft.note || null,
+      });
+      if (rpcError) throw rpcError;
+      setActualShifts((current) => ({
+        ...current,
+        [key]: { ...current[key], actual_start_time: actualDraft.start, actual_end_time: actualDraft.end, actual_approved_at: new Date().toISOString(), actual_approved_by: profile?.id || null },
+      }));
+      setActualEditorKey(null);
+      setMessage(language === "es" ? "Horas reales actualizadas." : language === "fi" ? "Toteutuneet tunnit päivitetty." : "Actual hours updated.");
+    } catch (e) {
+      setError(formatError(e));
+    } finally {
+      setSavingActual(false);
+    }
+  }
+
+  async function clearActualHours(key: string) {
+    if (!canEditActual) return;
+    const actual = actualShifts[key];
+    if (!actual?.id) return;
+    try {
+      setSavingActual(true);
+      setError("");
+      const { error: rpcError } = await supabase.rpc("clear_actual_shift_time", { p_shift_id: actual.id });
+      if (rpcError) throw rpcError;
+      setActualShifts((current) => ({ ...current, [key]: { ...current[key], actual_start_time: null, actual_end_time: null, actual_approved_at: null, actual_approved_by: null } }));
+      setActualEditorKey(null);
+      setMessage(language === "es" ? "Se restablecieron las horas programadas." : language === "fi" ? "Suunnitellut tunnit palautettu." : "Scheduled hours restored.");
+    } catch (e) {
+      setError(formatError(e));
+    } finally {
+      setSavingActual(false);
+    }
+  }
+
   const selectedRestaurant = restaurants.find((r) => r.id === restaurantId);
 
   if (loading && !restaurants.length) return <div className="panel">{t.loading || "Loading…"}</div>;
@@ -438,6 +531,10 @@ export function RotaPage() {
           <button className="secondary" onClick={() => moveWeeks(-21)}>← {t.previous || "Previous"}</button>
           <button className="secondary" onClick={() => moveWeeks(21)}>{t.next || "Next"} →</button>
           {canEdit && <button disabled={saving || !dirty.size || qaIssues.length > 0} title={qaIssues.length ? (language === "es" ? "Corrige los errores de Rota QA antes de guardar" : language === "fi" ? "Korjaa Rota QA -virheet ennen tallennusta" : "Fix Rota QA issues before saving") : ""} onClick={() => void saveAll()}>{saving ? (t.saving || "Saving…") : `${t.save || "Save"}${dirty.size ? ` (${dirty.size})` : ""}`}</button>}
+          <label className="rota-print-actual-toggle">
+            <input type="checkbox" checked={printActual} onChange={(e) => setPrintActual(e.target.checked)} />
+            <span>{language === "es" ? "Imprimir horas reales" : language === "fi" ? "Tulosta toteutuneet" : "Print actual hours"}</span>
+          </label>
           <button onClick={() => window.print()}>{t.print || "Print"}</button>
         </div>
       </div>
@@ -446,7 +543,7 @@ export function RotaPage() {
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
       <div className="phase-card rota-tip no-print">
-        <strong>Phase 6.1:</strong> {language === "fi" ? "Rota tallentuu automaattisesti 1,5 sekunnin kuluttua muutoksista. Rota QA estää virheelliset automaattitallennukset." : language === "es" ? "El Rota se guarda automáticamente 1,5 segundos después de los cambios. Rota QA bloquea el autoguardado si detecta errores." : "Rota autosaves 1.5 seconds after changes. Rota QA blocks autosave when it detects invalid shifts."}
+        <strong>Phase 6.5.1:</strong> {language === "fi" ? "Rota tallentuu automaattisesti. Hyväksytyt toteutuneet tunnit näkyvät suunnitellun vuoron rinnalla ja Admin/Super Admin voi korjata niitä suoraan." : language === "es" ? "El Rota se guarda automáticamente. Las horas reales aprobadas aparecen junto al turno programado y Admin/Super Admin puede corregirlas directamente." : "Rota autosaves automatically. Approved actual hours appear beside the scheduled shift and Admin/Super Admin can correct them directly."}
       </div>
 
       <div className={`rota-qa-card no-print ${qaIssues.length ? "has-errors" : "is-ready"}`}>
@@ -557,6 +654,22 @@ export function RotaPage() {
                                             <input aria-label={`Note ${slot}`} type="text" value={shift.note} disabled={!canEdit} placeholder={t.note || "Note"} onChange={(e) => updateShift(employee.id, date, slot, { note: e.target.value })} />
                                           </div>
                                           <small>{hoursLabel(hours)}{hours ? " h" : ""}</small>
+                                          {(() => {
+                                            const actual = actualShifts[key];
+                                            const hasActual = Boolean(actual?.actual_start_time && actual?.actual_end_time && actual?.actual_approved_at);
+                                            if (!actual?.id) return null;
+                                            return (
+                                              <div className="actual-hours-box">
+                                                {hasActual && <div className="actual-hours-approved"><strong>{language === "es" ? "Real" : language === "fi" ? "Toteutunut" : "Actual"}: {actual.actual_start_time}–{actual.actual_end_time} ✓</strong></div>}
+                                                {canEditActual && actualEditorKey !== key && <button type="button" className="small secondary actual-edit-button" onClick={() => openActualEditor(key)}>{hasActual ? (language === "es" ? "Editar horas reales" : language === "fi" ? "Muokkaa toteutuneita" : "Edit actual hours") : (language === "es" ? "Añadir horas reales" : language === "fi" ? "Lisää toteutuneet" : "Add actual hours")}</button>}
+                                                {canEditActual && actualEditorKey === key && <div className="actual-hours-editor">
+                                                  <div className="shift-time-row"><input type="time" value={actualDraft.start} onChange={(e) => setActualDraft((d) => ({ ...d, start: e.target.value }))}/><span>–</span><input type="time" value={actualDraft.end} onChange={(e) => setActualDraft((d) => ({ ...d, end: e.target.value }))}/></div>
+                                                  <input type="text" placeholder={language === "es" ? "Motivo / nota" : language === "fi" ? "Syy / huomautus" : "Reason / note"} value={actualDraft.note} onChange={(e) => setActualDraft((d) => ({ ...d, note: e.target.value }))}/>
+                                                  <div className="actual-hours-actions"><button type="button" className="small" disabled={savingActual} onClick={() => void saveActualHours(key)}>{language === "es" ? "Guardar real" : language === "fi" ? "Tallenna toteutunut" : "Save actual"}</button><button type="button" className="small secondary" disabled={savingActual} onClick={() => setActualEditorKey(null)}>{language === "es" ? "Cancelar" : language === "fi" ? "Peruuta" : "Cancel"}</button>{hasActual && <button type="button" className="small danger" disabled={savingActual} onClick={() => void clearActualHours(key)}>{language === "es" ? "Usar programado" : language === "fi" ? "Käytä suunniteltua" : "Use scheduled"}</button>}</div>
+                                                </div>}
+                                              </div>
+                                            );
+                                          })()}
                                         </div>
                                       );
                                     })}
@@ -573,6 +686,7 @@ export function RotaPage() {
                                       return (
                                         <div className="print-shift" key={slot}>
                                           {shift.start_time && shift.end_time && <strong>{displayTime(shift.start_time)}–{displayTime(shift.end_time)}</strong>}
+                                          {printActual && (() => { const actual = actualShifts[shiftKey(employee.id, date, slot)]; return actual?.actual_start_time && actual?.actual_end_time && actual?.actual_approved_at ? <span className="print-actual">Actual: {actual.actual_start_time}–{actual.actual_end_time}</span> : null; })()}
                                           {shift.code && <span className="print-code">{shift.code.toUpperCase()}</span>}
                                           {shift.note && <span className="print-note">{shift.note}</span>}
                                         </div>

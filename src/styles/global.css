@@ -412,3 +412,10 @@ button.small{padding:6px 9px;font-size:12px}
 .time-permission-fieldset legend{font-weight:800;padding:0 6px}.time-permission-fieldset p{margin:0;font-size:12px}
 .actual-hours-table{min-width:1320px}.time-correction-editor{display:grid;grid-template-columns:110px 14px 110px minmax(180px,1fr) auto;gap:6px;align-items:center;min-width:620px}.time-correction-editor input{min-width:0}.time-correction-editor .time-reason{width:100%}.time-correction-status{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.time-approval-panel{display:grid;gap:12px}.time-approval-table{min-width:1120px}.time-approval-table input{min-width:180px}
 @media(max-width:900px){.time-correction-editor{grid-template-columns:1fr 14px 1fr}.time-correction-editor .time-reason,.time-correction-editor button{grid-column:1/-1}.actual-hours-table{min-width:1080px}}
+
+
+/* Phase 6.5.1 — Rota actual-hours indicator and direct admin editing */
+.rota-print-actual-toggle{display:flex!important;align-items:center!important;gap:7px!important;min-width:0!important;padding:6px 9px;border:1px solid #dbe3ee;border-radius:9px;background:#fff}
+.rota-print-actual-toggle input{width:auto;margin:0}.rota-print-actual-toggle span{font-size:11px!important;color:#334155!important;white-space:nowrap}
+.actual-hours-box{display:grid;gap:5px;margin-top:2px;padding-top:5px;border-top:1px dashed #dbe3ee}.actual-hours-approved{padding:5px 7px;border-radius:7px;background:#ecfdf5;color:#166534;font-size:10px}.actual-edit-button{width:100%;font-size:10px!important;padding:5px 6px!important}.actual-hours-editor{display:grid;gap:5px;padding:7px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff}.actual-hours-editor>input{padding:6px;font-size:11px}.actual-hours-actions{display:flex;gap:4px;flex-wrap:wrap}.actual-hours-actions button{font-size:10px!important;padding:5px 6px!important}.actual-hours-actions .danger{background:#fff1f2!important;color:#9f1239!important;border-color:#fecdd3!important}.print-actual{display:block;font-size:6.2pt;font-weight:700;color:#166534}
+@media print{.print-actual{color:#111!important}}
