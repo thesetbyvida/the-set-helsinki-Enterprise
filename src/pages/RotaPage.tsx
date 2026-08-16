@@ -97,6 +97,8 @@ export function RotaPage() {
   const [actualDraft, setActualDraft] = useState({ start: "", end: "", note: "" });
   const [savingActual, setSavingActual] = useState(false);
   const [printActual, setPrintActual] = useState(true);
+  const [rotaEditMode, setRotaEditMode] = useState<"scheduled" | "actual">("scheduled");
+  const [actualInlineDrafts, setActualInlineDrafts] = useState<Record<string, { start: string; end: string; note: string }>>({});
   const canEditActual = Boolean(profile && ["super_admin", "admin"].includes(profile.role));
 
   const locale = language === "fi" ? "fi-FI" : language === "en" ? "en-GB" : "es-ES";
@@ -485,6 +487,72 @@ export function RotaPage() {
     }
   }
 
+  function actualInlineDraft(key: string) {
+    const scheduled = shifts[key] || EMPTY_SHIFT;
+    const actual = actualShifts[key];
+    return actualInlineDrafts[key] || {
+      start: actual?.actual_start_time || scheduled.start_time || "",
+      end: actual?.actual_end_time || scheduled.end_time || "",
+      note: "",
+    };
+  }
+
+  function updateActualInlineDraft(key: string, patch: Partial<{ start: string; end: string; note: string }>) {
+    setActualInlineDrafts((current) => ({
+      ...current,
+      [key]: { ...actualInlineDraft(key), ...patch },
+    }));
+  }
+
+  async function saveActualInlineHours(key: string) {
+    if (!canEditActual) return;
+    const actual = actualShifts[key];
+    const draft = actualInlineDraft(key);
+    if (!actual?.id) {
+      setError(language === "es" ? "Guarda primero el turno programado." : language === "fi" ? "Tallenna suunniteltu vuoro ensin." : "Save the scheduled shift first.");
+      return;
+    }
+    if (!draft.start || !draft.end) {
+      setError(language === "es" ? "La hora real de entrada y salida son obligatorias." : language === "fi" ? "Toteutunut alku- ja loppuaika ovat pakollisia." : "Actual start and end time are required.");
+      return;
+    }
+    if (draft.start === draft.end) {
+      setError(language === "es" ? "La hora real de entrada y salida no pueden ser iguales." : language === "fi" ? "Toteutunut alku- ja loppuaika eivät voi olla samat." : "Actual start and end time cannot be equal.");
+      return;
+    }
+    try {
+      setSavingActual(true);
+      setError("");
+      const { error: rpcError } = await supabase.rpc("set_actual_shift_time", {
+        p_shift_id: actual.id,
+        p_actual_start_time: draft.start,
+        p_actual_end_time: draft.end,
+        p_note: draft.note || null,
+      });
+      if (rpcError) throw rpcError;
+      setActualShifts((current) => ({
+        ...current,
+        [key]: {
+          ...current[key],
+          actual_start_time: draft.start,
+          actual_end_time: draft.end,
+          actual_approved_at: new Date().toISOString(),
+          actual_approved_by: profile?.id || null,
+        },
+      }));
+      setActualInlineDrafts((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      setMessage(language === "es" ? "Horas reales guardadas; el turno programado no cambió." : language === "fi" ? "Toteutuneet tunnit tallennettu; suunniteltu vuoro ei muuttunut." : "Actual hours saved; scheduled shift was preserved.");
+    } catch (e) {
+      setError(formatError(e));
+    } finally {
+      setSavingActual(false);
+    }
+  }
+
   async function clearActualHours(key: string) {
     if (!canEditActual) return;
     const actual = actualShifts[key];
@@ -531,6 +599,10 @@ export function RotaPage() {
           <button className="secondary" onClick={() => moveWeeks(-21)}>← {t.previous || "Previous"}</button>
           <button className="secondary" onClick={() => moveWeeks(21)}>{t.next || "Next"} →</button>
           {canEdit && <button disabled={saving || !dirty.size || qaIssues.length > 0} title={qaIssues.length ? (language === "es" ? "Corrige los errores de Rota QA antes de guardar" : language === "fi" ? "Korjaa Rota QA -virheet ennen tallennusta" : "Fix Rota QA issues before saving") : ""} onClick={() => void saveAll()}>{saving ? (t.saving || "Saving…") : `${t.save || "Save"}${dirty.size ? ` (${dirty.size})` : ""}`}</button>}
+          {canEditActual && <div className="rota-edit-mode" role="group" aria-label="Rota edit mode">
+            <button type="button" className={rotaEditMode === "scheduled" ? "active" : "secondary"} onClick={() => setRotaEditMode("scheduled")}>{language === "es" ? "Programado" : language === "fi" ? "Suunniteltu" : "Scheduled"}</button>
+            <button type="button" className={rotaEditMode === "actual" ? "active" : "secondary"} onClick={() => setRotaEditMode("actual")}>{language === "es" ? "Horas reales" : language === "fi" ? "Toteutuneet" : "Actual hours"}</button>
+          </div>}
           <label className="rota-print-actual-toggle">
             <input type="checkbox" checked={printActual} onChange={(e) => setPrintActual(e.target.checked)} />
             <span>{language === "es" ? "Imprimir horas reales" : language === "fi" ? "Tulosta toteutuneet" : "Print actual hours"}</span>
@@ -543,7 +615,7 @@ export function RotaPage() {
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
       <div className="phase-card rota-tip no-print">
-        <strong>Phase 6.5.1:</strong> {language === "fi" ? "Rota tallentuu automaattisesti. Hyväksytyt toteutuneet tunnit näkyvät suunnitellun vuoron rinnalla ja Admin/Super Admin voi korjata niitä suoraan." : language === "es" ? "El Rota se guarda automáticamente. Las horas reales aprobadas aparecen junto al turno programado y Admin/Super Admin puede corregirlas directamente." : "Rota autosaves automatically. Approved actual hours appear beside the scheduled shift and Admin/Super Admin can correct them directly."}
+        <strong>Phase 6.5.2:</strong> {language === "fi" ? "Käytä Suunniteltu-tilaa julkaistun työvuoron muokkaukseen ja Toteutuneet-tilaa toteutuneiden tuntien korjaukseen ilman alkuperäisen vuoron korvaamista." : language === "es" ? "Usa Programado para modificar el horario publicado y Horas reales para corregir lo trabajado sin sobrescribir el Rota original." : "Use Scheduled to edit the published rota and Actual hours to correct worked time without overwriting the original shift."}
       </div>
 
       <div className={`rota-qa-card no-print ${qaIssues.length ? "has-errors" : "is-ready"}`}>
@@ -642,19 +714,42 @@ export function RotaPage() {
                                               <button type="button" className="icon-danger" title={removeShiftLabel} aria-label={removeShiftLabel} onClick={() => removeShift(employee.id, date, slot)}>×</button>
                                             </div>
                                           )}
-                                          <div className="shift-time-row">
-                                            <input aria-label={`Start ${slot}`} type="time" value={shift.start_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { start_time: e.target.value || null })} />
-                                            <span>–</span>
-                                            <input aria-label={`End ${slot}`} type="time" value={shift.end_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { end_time: e.target.value || null })} />
-                                          </div>
-                                          <div className="shift-meta-row">
-                                            <select aria-label={`Code ${slot}`} value={shift.code} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { code: e.target.value })}>
-                                              {CODES.map((code) => <option key={code} value={code}>{code ? code.toUpperCase() : (t.code || "Code")}</option>)}
-                                            </select>
-                                            <input aria-label={`Note ${slot}`} type="text" value={shift.note} disabled={!canEdit} placeholder={t.note || "Note"} onChange={(e) => updateShift(employee.id, date, slot, { note: e.target.value })} />
-                                          </div>
-                                          <small>{hoursLabel(hours)}{hours ? " h" : ""}</small>
-                                          {(() => {
+                                          {rotaEditMode === "scheduled" || !canEditActual ? <>
+                                            <div className="scheduled-edit-label">{language === "es" ? "Programado" : language === "fi" ? "Suunniteltu" : "Scheduled"}</div>
+                                            <div className="shift-time-row">
+                                              <input aria-label={`Start ${slot}`} type="time" value={shift.start_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { start_time: e.target.value || null })} />
+                                              <span>–</span>
+                                              <input aria-label={`End ${slot}`} type="time" value={shift.end_time || ""} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { end_time: e.target.value || null })} />
+                                            </div>
+                                            <div className="shift-meta-row">
+                                              <select aria-label={`Code ${slot}`} value={shift.code} disabled={!canEdit} onChange={(e) => updateShift(employee.id, date, slot, { code: e.target.value })}>
+                                                {CODES.map((code) => <option key={code} value={code}>{code ? code.toUpperCase() : (t.code || "Code")}</option>)}
+                                              </select>
+                                              <input aria-label={`Note ${slot}`} type="text" value={shift.note} disabled={!canEdit} placeholder={t.note || "Note"} onChange={(e) => updateShift(employee.id, date, slot, { note: e.target.value })} />
+                                            </div>
+                                            <small>{hoursLabel(hours)}{hours ? " h" : ""}</small>
+                                          </> : (() => {
+                                            const actual = actualShifts[key];
+                                            if (!actual?.id) return <div className="actual-inline-empty">{language === "es" ? "Guarda primero el turno programado." : language === "fi" ? "Tallenna suunniteltu vuoro ensin." : "Save the scheduled shift first."}</div>;
+                                            const draft = actualInlineDraft(key);
+                                            const hasActual = Boolean(actual.actual_start_time && actual.actual_end_time && actual.actual_approved_at);
+                                            return <div className="actual-inline-editor">
+                                              <div className="scheduled-reference"><span>{language === "es" ? "Programado" : language === "fi" ? "Suunniteltu" : "Scheduled"}</span><strong>{shift.start_time && shift.end_time ? `${displayTime(shift.start_time)}–${displayTime(shift.end_time)}` : "—"}</strong></div>
+                                              <div className="actual-inline-label">{language === "es" ? "Horas reales" : language === "fi" ? "Toteutuneet" : "Actual hours"}</div>
+                                              <div className="shift-time-row">
+                                                <input aria-label={`Actual start ${slot}`} type="time" value={draft.start} onChange={(e) => updateActualInlineDraft(key, { start: e.target.value })} />
+                                                <span>–</span>
+                                                <input aria-label={`Actual end ${slot}`} type="time" value={draft.end} onChange={(e) => updateActualInlineDraft(key, { end: e.target.value })} />
+                                              </div>
+                                              <input className="actual-inline-note" type="text" placeholder={language === "es" ? "Motivo / nota" : language === "fi" ? "Syy / huomautus" : "Reason / note"} value={draft.note} onChange={(e) => updateActualInlineDraft(key, { note: e.target.value })} />
+                                              <div className="actual-inline-actions">
+                                                <button type="button" className="small" disabled={savingActual} onClick={() => void saveActualInlineHours(key)}>{language === "es" ? "Guardar real" : language === "fi" ? "Tallenna toteutunut" : "Save actual"}</button>
+                                                {hasActual && <button type="button" className="small secondary" disabled={savingActual} onClick={() => void clearActualHours(key)}>{language === "es" ? "Usar programado" : language === "fi" ? "Käytä suunniteltua" : "Use scheduled"}</button>}
+                                              </div>
+                                              {hasActual && <div className="actual-hours-approved"><strong>{language === "es" ? "Real aprobado" : language === "fi" ? "Hyväksytty toteutunut" : "Approved actual"}: {actual.actual_start_time}–{actual.actual_end_time} ✓</strong></div>}
+                                            </div>;
+                                          })()}
+                                          {rotaEditMode === "scheduled" && (() => {
                                             const actual = actualShifts[key];
                                             const hasActual = Boolean(actual?.actual_start_time && actual?.actual_end_time && actual?.actual_approved_at);
                                             if (!actual?.id) return null;
