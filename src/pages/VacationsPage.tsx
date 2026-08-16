@@ -302,6 +302,11 @@ export default function VacationsPage() {
 
       {error && <div className="error-banner">{error}</div>}
       {success && <div className="success-banner">{success}</div>}
+      {isAdmin && (
+        <div className="info-banner">
+          Phase 6.4.2: Approve + Rota writes VL/VV only when the full requested date range is safe and never overwrites worked or split shifts.
+        </div>
+      )}
 
       <div className="request-kpis">
         <div><span>Pending</span><strong>{counts.pending}</strong></div>

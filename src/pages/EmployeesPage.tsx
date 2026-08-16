@@ -409,7 +409,7 @@ export function EmployeesPage() {
 
         {!canEdit && <div className="alert">{t.onlyAdminsEmployees}</div>}
 
-        <form className="employee-form" onSubmit={save}>
+        <form className="employee-form" onSubmit={save} autoComplete="off">
           <div className="form-columns">
             <label>
               {t.employeeNumber}
@@ -438,6 +438,8 @@ export function EmployeesPage() {
               {t.employeeEmail}
               <input
                 type="email"
+                name="employee_contact_email_no_autofill"
+                autoComplete="new-password"
                 value={form.email}
                 onChange={(event) => setForm({ ...form, email: event.target.value })}
                 disabled={!canEdit}
@@ -447,6 +449,9 @@ export function EmployeesPage() {
             <label>
               {t.employeePhone}
               <input
+                type="tel"
+                name="employee_contact_phone_no_autofill"
+                autoComplete="off"
                 value={form.phone}
                 onChange={(event) => setForm({ ...form, phone: event.target.value })}
                 disabled={!canEdit}
@@ -457,6 +462,8 @@ export function EmployeesPage() {
           <label>
             {t.employeeAddress}
             <input
+              name="employee_work_address_no_autofill"
+              autoComplete="off"
               value={form.address}
               onChange={(event) => setForm({ ...form, address: event.target.value })}
               disabled={!canEdit}
