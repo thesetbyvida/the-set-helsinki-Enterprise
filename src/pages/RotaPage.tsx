@@ -732,7 +732,7 @@ export function RotaPage() {
                                             const actual = actualShifts[key];
                                             if (!actual?.id) return <div className="actual-inline-empty">{language === "es" ? "Guarda primero el turno programado." : language === "fi" ? "Tallenna suunniteltu vuoro ensin." : "Save the scheduled shift first."}</div>;
                                             const draft = actualInlineDraft(key);
-                                            const hasActual = Boolean(actual.actual_start_time && actual.actual_end_time && actual.actual_approved_at);
+                                            const hasActual = Boolean(actual.actual_start_time && actual.actual_end_time);
                                             return <div className="actual-inline-editor">
                                               <div className="scheduled-reference"><span>{language === "es" ? "Programado" : language === "fi" ? "Suunniteltu" : "Scheduled"}</span><strong>{shift.start_time && shift.end_time ? `${displayTime(shift.start_time)}–${displayTime(shift.end_time)}` : "—"}</strong></div>
                                               <div className="actual-inline-label">{language === "es" ? "Horas reales" : language === "fi" ? "Toteutuneet" : "Actual hours"}</div>
@@ -751,11 +751,11 @@ export function RotaPage() {
                                           })()}
                                           {rotaEditMode === "scheduled" && (() => {
                                             const actual = actualShifts[key];
-                                            const hasActual = Boolean(actual?.actual_start_time && actual?.actual_end_time && actual?.actual_approved_at);
+                                            const hasActual = Boolean(actual?.actual_start_time && actual?.actual_end_time);
                                             if (!actual?.id) return null;
                                             return (
                                               <div className="actual-hours-box">
-                                                {hasActual && <div className="actual-hours-approved"><strong>{language === "es" ? "Real" : language === "fi" ? "Toteutunut" : "Actual"}: {actual.actual_start_time}–{actual.actual_end_time} ✓</strong></div>}
+                                                {hasActual && <div className="actual-hours-approved"><div><strong>{language === "es" ? "Programado" : language === "fi" ? "Suunniteltu" : "Scheduled"}: {shift.start_time && shift.end_time ? `${displayTime(shift.start_time)}–${displayTime(shift.end_time)}` : "—"}</strong></div><div><strong>{language === "es" ? "Actual ✓" : language === "fi" ? "Toteutunut ✓" : "Actual ✓"}: {actual.actual_start_time}–{actual.actual_end_time}</strong></div></div>}
                                                 {canEditActual && actualEditorKey !== key && <button type="button" className="small secondary actual-edit-button" onClick={() => openActualEditor(key)}>{hasActual ? (language === "es" ? "Editar horas reales" : language === "fi" ? "Muokkaa toteutuneita" : "Edit actual hours") : (language === "es" ? "Añadir horas reales" : language === "fi" ? "Lisää toteutuneet" : "Add actual hours")}</button>}
                                                 {canEditActual && actualEditorKey === key && <div className="actual-hours-editor">
                                                   <div className="shift-time-row"><input type="time" value={actualDraft.start} onChange={(e) => setActualDraft((d) => ({ ...d, start: e.target.value }))}/><span>–</span><input type="time" value={actualDraft.end} onChange={(e) => setActualDraft((d) => ({ ...d, end: e.target.value }))}/></div>
@@ -781,7 +781,7 @@ export function RotaPage() {
                                       return (
                                         <div className="print-shift" key={slot}>
                                           {shift.start_time && shift.end_time && <strong>{displayTime(shift.start_time)}–{displayTime(shift.end_time)}</strong>}
-                                          {printActual && (() => { const actual = actualShifts[shiftKey(employee.id, date, slot)]; return actual?.actual_start_time && actual?.actual_end_time && actual?.actual_approved_at ? <span className="print-actual">Actual: {actual.actual_start_time}–{actual.actual_end_time}</span> : null; })()}
+                                          {printActual && (() => { const actual = actualShifts[shiftKey(employee.id, date, slot)]; return actual?.actual_start_time && actual?.actual_end_time ? <span className="print-actual">Actual: {actual.actual_start_time}–{actual.actual_end_time}</span> : null; })()}
                                           {shift.code && <span className="print-code">{shift.code.toUpperCase()}</span>}
                                           {shift.note && <span className="print-note">{shift.note}</span>}
                                         </div>
