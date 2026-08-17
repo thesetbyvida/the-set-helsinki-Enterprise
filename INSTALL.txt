@@ -1,14 +1,31 @@
-PHASE 6.5.6 FIXED MINIMAL PATCH
+THE SET HELSINKI ENTERPRISE — PHASE 6.5.6 FIX 3
 
-Copy ONLY the contents of this ZIP into the root of the CLEAN GitHub repository.
-Choose Replace when macOS asks.
+This patch is built for the real Vite structure used by the project:
+  src/pages/HourCalcPage.tsx
+  src/context/AppContext.tsx
+  src/lib/*.ts
 
-Expected changed files in GitHub Desktop:
-1. package.json
-2. src/pages/HourCalcPage.tsx
+INSTALL
+1. Start from the CLEAN GitHub clone that shows 0 changed files.
+2. Copy the contents of this ZIP into the repository root.
+3. Choose Replace when macOS asks.
+4. GitHub Desktop should show exactly 2 changed files:
+   - package.json
+   - src/pages/HourCalcPage.tsx
+5. Commit: Enterprise 6.5.6 fix 3
+6. Push origin.
+7. Wait for a NEW Vercel deployment from that commit. Do not redeploy an older failed deployment.
 
-Do NOT copy RotaPage.tsx for this fix.
-No SQL migration is required.
+IMPORTANT
+- Do not create src/HourCalcPage.tsx.
+- Do not delete src/pages/HourCalcPage.tsx.
+- Do not copy any full project ZIP over the CLEAN clone.
+- No Supabase SQL changes are required for this patch.
 
-Then commit as: Enterprise 6.5.6 fixed
-Push origin and verify Vercel becomes Ready.
+EXPECTED FUNCTIONALITY
+- HourCalc opens in Payroll period mode by default.
+- Payroll period uses restaurant payroll_settings.period_start_day (default 21).
+- Previous/Next moves whole payroll periods.
+- 3-week rota mode remains available.
+- A shift belongs to the payroll period according to its shift_date/start date. Therefore a shift starting on the 20th remains in the period ending on the 20th even if it crosses midnight into the 21st.
+- Approved Actual hours continue to be used by HourCalc.
