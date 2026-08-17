@@ -628,7 +628,7 @@ export function RotaPage() {
       {message && <div className="notice no-print">{message}</div>}
       {!canEdit && <div className="phase-card no-print">{t.rotaReadOnly || "Read-only rota. Managers and admins can edit shifts."}</div>}
       <div className="phase-card rota-tip no-print">
-        <strong>Phase 6.5.5:</strong> {language === "fi" ? "Käytä Suunniteltu-tilaa julkaistun työvuoron muokkaukseen ja Toteutuneet-tilaa toteutuneiden tuntien korjaukseen ilman alkuperäisen vuoron korvaamista." : language === "es" ? "Usa Programado para modificar el horario publicado y Horas reales para corregir lo trabajado sin sobrescribir el Rota original." : "Use Scheduled to edit the published rota and Actual hours to correct worked time without overwriting the original shift."}
+        <strong>Phase 6.5.6:</strong> {language === "fi" ? "Käytä Suunniteltu-tilaa julkaistun työvuoron muokkaukseen ja Toteutuneet-tilaa toteutuneiden tuntien korjaukseen ilman alkuperäisen vuoron korvaamista." : language === "es" ? "Usa Programado para modificar el horario publicado y Horas reales para corregir lo trabajado sin sobrescribir el Rota original." : "Use Scheduled to edit the published rota and Actual hours to correct worked time without overwriting the original shift."}
       </div>
 
       <div className={`rota-qa-card no-print ${qaIssues.length ? "has-errors" : "is-ready"}`}>

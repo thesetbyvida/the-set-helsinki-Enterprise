@@ -1,0 +1,21 @@
+THE SET HELSINKI ENTERPRISE — PHASE 6.5.6
+
+This is a MINIMAL update package. It contains only 3 application files.
+
+Copy the contents of this folder into the ROOT of your clean repository:
+- package.json
+- src/pages/HourCalcPage.tsx
+- src/pages/RotaPage.tsx
+
+Choose Replace when macOS asks.
+
+Expected GitHub Desktop result: exactly 3 changed files.
+Do NOT copy node_modules, dist, SQL migrations, or the old full ZIP.
+
+Phase 6.5.6:
+- HourCalc defaults to Payroll period mode.
+- Payroll period uses the restaurant payroll start day (normally 21 -> 20).
+- Previous / Next moves by payroll period.
+- Optional 3-week rota mode remains available.
+- A shift starting on the final payroll day belongs to that payroll period even if it ends after midnight.
+- Approved actual hours remain used by HourCalc/Payroll.
