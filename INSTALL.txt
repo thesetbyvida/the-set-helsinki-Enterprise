@@ -1,21 +1,14 @@
-THE SET HELSINKI ENTERPRISE — PHASE 6.5.6
+PHASE 6.5.6 FIXED MINIMAL PATCH
 
-This is a MINIMAL update package. It contains only 3 application files.
-
-Copy the contents of this folder into the ROOT of your clean repository:
-- package.json
-- src/pages/HourCalcPage.tsx
-- src/pages/RotaPage.tsx
-
+Copy ONLY the contents of this ZIP into the root of the CLEAN GitHub repository.
 Choose Replace when macOS asks.
 
-Expected GitHub Desktop result: exactly 3 changed files.
-Do NOT copy node_modules, dist, SQL migrations, or the old full ZIP.
+Expected changed files in GitHub Desktop:
+1. package.json
+2. src/pages/HourCalcPage.tsx
 
-Phase 6.5.6:
-- HourCalc defaults to Payroll period mode.
-- Payroll period uses the restaurant payroll start day (normally 21 -> 20).
-- Previous / Next moves by payroll period.
-- Optional 3-week rota mode remains available.
-- A shift starting on the final payroll day belongs to that payroll period even if it ends after midnight.
-- Approved actual hours remain used by HourCalc/Payroll.
+Do NOT copy RotaPage.tsx for this fix.
+No SQL migration is required.
+
+Then commit as: Enterprise 6.5.6 fixed
+Push origin and verify Vercel becomes Ready.
